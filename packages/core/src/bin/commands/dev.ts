@@ -276,11 +276,11 @@ export async function dev({ cliOptions }: { cliOptions: CliOptions }) {
           preBuild: preCompileResult.result,
           schemaBuild: compileSchemaResult.result,
         });
-        crashRecoveryCheckpoint = await database.migrate({
+        ({ crashRecoveryCheckpoint } = await database.migrate({
           buildId: indexingBuildResult.result.buildId,
           chains: indexingBuildResult.result.chains,
           finalizedBlocks: indexingBuildResult.result.finalizedBlocks,
-        });
+        }));
 
         await database.migrateSync();
 

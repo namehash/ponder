@@ -225,7 +225,7 @@ export async function start({
     preBuild: preCompileResult.result,
     schemaBuild: compileSchemaResult.result,
   });
-  const crashRecoveryCheckpoint = await database.migrate({
+  const { crashRecoveryCheckpoint, createIndexes } = await database.migrate({
     buildId: indexingBuildResult.result.buildId,
     chains: indexingBuildResult.result.chains,
     finalizedBlocks: indexingBuildResult.result.finalizedBlocks,
@@ -302,13 +302,13 @@ export async function start({
 
   switch (preCompileResult.result.ordering) {
     case "omnichain":
-      runOmnichain(app);
+      runOmnichain({ ...app, createIndexes });
       break;
     case "multichain":
-      runMultichain(app);
+      runMultichain({ ...app, createIndexes });
       break;
     case "experimental_isolated": {
-      isolatedController(app);
+      isolatedController({ ...app, createIndexes });
       break;
     }
   }

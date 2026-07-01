@@ -2,7 +2,10 @@ import path from "node:path";
 import url from "node:url";
 import v8 from "node:v8";
 import { Worker } from "node:worker_threads";
-import { createIndexes, createViews } from "@/database/actions.js";
+import {
+  createIndexes as createIndexesAction,
+  createViews,
+} from "@/database/actions.js";
 import { type Database, getPonderMetaTable } from "@/database/index.js";
 import type { Common } from "@/internal/common.js";
 import {
@@ -36,6 +39,7 @@ export async function isolatedController({
   schemaBuild,
   indexingBuild,
   crashRecoveryCheckpoint,
+  createIndexes = true,
   database,
 }: {
   common: Common;
@@ -44,6 +48,7 @@ export async function isolatedController({
   schemaBuild: SchemaBuild;
   indexingBuild: IndexingBuild;
   crashRecoveryCheckpoint: CrashRecoveryCheckpoint;
+  createIndexes?: boolean;
   database: Database;
 }) {
   const backfillEndClock = startClock();
@@ -85,15 +90,22 @@ export async function isolatedController({
       clearInterval(etaInterval);
 
       let endClock = startClock();
-      await createIndexes(database.adminQB, {
-        statements: schemaBuild.statements,
-      });
 
-      if (schemaBuild.statements.indexes.sql.length > 0) {
+      if (createIndexes) {
+        await createIndexesAction(database.adminQB, {
+          statements: schemaBuild.statements,
+        });
+
+        if (schemaBuild.statements.indexes.sql.length > 0) {
+          common.logger.info({
+            msg: "Created database indexes",
+            count: schemaBuild.statements.indexes.sql.length,
+            duration: endClock(),
+          });
+        }
+      } else {
         common.logger.info({
-          msg: "Created database indexes",
-          count: schemaBuild.statements.indexes.sql.length,
-          duration: endClock(),
+          msg: "Skipped database index creation (indexes preserved from crash recovery)",
         });
       }
 
