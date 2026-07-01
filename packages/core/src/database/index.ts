@@ -1080,7 +1080,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
 
       return {
         crashRecoveryCheckpoint: result.crashRecoveryCheckpoint,
-        createIndexes: !result.indexesDropped,
+        createIndexes: result.indexesDropped,
       };
     },
   };

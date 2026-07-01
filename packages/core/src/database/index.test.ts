@@ -712,7 +712,7 @@ test("migrate() with crash recovery preserves indexes when gap is small and init
     ],
   });
 
-  expect(shouldCreateIndexes).toBe(true);
+  expect(shouldCreateIndexes).toBe(false);
 
   // Both the primary-key index and the custom balanceIdx survive (2 total).
   const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
@@ -813,7 +813,7 @@ test("migrate() with crash recovery drops indexes when initial sync was not comp
     ],
   });
 
-  expect(shouldCreateIndexes).toBe(false);
+  expect(shouldCreateIndexes).toBe(true);
 
   // balanceIdx is dropped; only the primary-key index remains.
   const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
@@ -923,7 +923,7 @@ test("migrate() with crash recovery drops indexes when gap exceeds threshold", a
     ],
   });
 
-  expect(shouldCreateIndexes).toBe(false);
+  expect(shouldCreateIndexes).toBe(true);
 
   // balanceIdx is dropped; only the primary-key index remains.
   const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
