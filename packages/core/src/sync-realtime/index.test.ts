@@ -1054,6 +1054,13 @@ test("handleReorg() throws error for deep reorg", async () => {
       number: "0x4",
       hash: "0x0000000000000000000000000000000000000000000000000000000000000000",
       parentHash: realtimeSync.unfinalizedBlocks[1]!.hash,
+      // Empty transactions so validateTransactionsAndBlock doesn't reject
+      // the fake hash, and non-zero logsBloom so eth_getLogs is skipped
+      // (blocks-only build has no logFilters, so bloom check short-circuits).
+      // Without these overrides, fetchBlockEventData calls eth_getLogs for
+      // the non-existent hash, triggering 9 retries (~63s) and a timeout.
+      transactions: [],
+      logsBloom: `0x${"00".repeat(255)}01`,
     }),
   );
 
