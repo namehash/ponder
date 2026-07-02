@@ -84,9 +84,28 @@ export function createPool(config: PoolConfig, logger: Logger) {
     }
   }
 
+  const rawStatementTimeout = process.env.PONDER_STATEMENT_TIMEOUT;
+  const statementTimeout =
+    rawStatementTimeout === undefined || rawStatementTimeout.trim() === ""
+      ? 2 * 60 * 1000
+      : Number(rawStatementTimeout);
+  if (
+    !Number.isFinite(statementTimeout) ||
+    !Number.isInteger(statementTimeout) ||
+    statementTimeout < 0
+  ) {
+    throw new Error(
+      `Invalid PONDER_STATEMENT_TIMEOUT: "${rawStatementTimeout}". It must be a non-negative integer (milliseconds).`,
+    );
+  }
+  logger.debug({
+    msg: "Postgres pool config",
+    statement_timeout: statementTimeout,
+  });
+
   const pool = new pg.Pool({
     // https://stackoverflow.com/questions/59155572/how-to-set-query-timeout-in-relation-to-statement-timeout
-    statement_timeout: 2 * 60 * 1000, // 2 minutes
+    statement_timeout: statementTimeout,
     // @ts-expect-error: The custom Client is an undocumented option.
     Client: Client,
     ...config,
