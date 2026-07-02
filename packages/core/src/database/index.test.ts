@@ -586,6 +586,9 @@ test("migrate() with crash recovery reverts rows", async () => {
     ],
   });
 
+  // createIndexes=false because is_ready=1 (initial sync completed) and the gap between
+  // the safe checkpoint (block 10) and the finalized block (block 10) is 0, which is
+  // below the recreateIndexesMinBlockGap threshold — so indexes are preserved.
   expect(migrateResult).toMatchInlineSnapshot(`
     {
       "crashRecoveryCheckpoint": [
@@ -594,7 +597,7 @@ test("migrate() with crash recovery reverts rows", async () => {
           "checkpoint": "000000000000000000000000010000000000000010000000000000000000000000000000000",
         },
       ],
-      "createIndexes": true,
+      "createIndexes": false,
     }
   `);
 
@@ -610,6 +613,64 @@ test("migrate() with crash recovery reverts rows", async () => {
   );
 
   expect(metadata).toHaveLength(1);
+
+  await context.common.shutdown.kill();
+});
+
+test("migrate() returns createIndexes=true on first run so indexes are actually created", async () => {
+  const account = onchainTable(
+    "account",
+    (p) => ({
+      address: p.hex().primaryKey(),
+      balance: p.bigint(),
+    }),
+    (table) => ({
+      balanceIdx: index().on(table.balance),
+    }),
+  );
+
+  const database = createDatabase({
+    common: context.common,
+    namespace: {
+      schema: "public",
+      viewsSchema: undefined,
+    },
+    preBuild: {
+      databaseConfig: context.databaseConfig,
+      ordering: "multichain",
+    },
+    schemaBuild: {
+      schema: { account },
+      statements: buildSchema({
+        schema: { account },
+        preBuild: { ordering: "multichain" },
+      }).statements,
+    },
+  });
+
+  const { createIndexes: shouldCreateIndexes } = await database.migrate({
+    buildId: "abc",
+    chains: [],
+    finalizedBlocks: [],
+  });
+
+  // Must be true on first run — previously a bug caused this to be false,
+  // so the runtime skipped createIndexesAction and custom indexes were never created.
+  expect(shouldCreateIndexes).toBe(true);
+
+  // Simulate what the runtime does: create indexes only when createIndexes=true.
+  if (shouldCreateIndexes) {
+    await createIndexes(database.userQB, {
+      statements: buildSchema({
+        schema: { account },
+        preBuild: { ordering: "multichain" },
+      }).statements,
+    });
+  }
+
+  // Both the primary-key index and the custom balanceIdx must exist.
+  const indexNames = await getUserIndexNames(database, "public", "account");
+  expect(indexNames).toHaveLength(2);
 
   await context.common.shutdown.kill();
 });

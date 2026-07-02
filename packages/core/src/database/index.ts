@@ -731,7 +731,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             return {
               status: "success",
               crashRecoveryCheckpoint: undefined,
-              indexesDropped: false,
+              indexesPreserved: false,
             } as const;
           }
 
@@ -860,7 +860,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             return {
               status: "success",
               crashRecoveryCheckpoint: undefined,
-              indexesDropped: false,
+              indexesPreserved: false,
             } as const;
           }
 
@@ -916,7 +916,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             return {
               status: "success",
               crashRecoveryCheckpoint: undefined,
-              indexesDropped: false,
+              indexesPreserved: false,
             } as const;
           }
 
@@ -1024,7 +1024,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
           return {
             status: "success",
             crashRecoveryCheckpoint,
-            indexesDropped: dropIndexes,
+            indexesPreserved: !dropIndexes,
           } as const;
         });
 
@@ -1080,7 +1080,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
 
       return {
         crashRecoveryCheckpoint: result.crashRecoveryCheckpoint,
-        createIndexes: result.indexesDropped,
+        createIndexes: !result.indexesPreserved,
       };
     },
   };
