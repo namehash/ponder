@@ -48,7 +48,7 @@ importers:
         specifier: ^8.15.6
         version: 8.16.2
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../packages/core
 
   docs:
@@ -109,7 +109,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -128,7 +128,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -153,7 +153,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -178,7 +178,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -203,7 +203,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -231,7 +231,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -256,7 +256,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -281,7 +281,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -306,7 +306,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -331,7 +331,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -356,7 +356,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -381,7 +381,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -406,7 +406,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -434,7 +434,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -459,7 +459,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -484,7 +484,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../packages/core
       viem:
         specifier: ^2.21.3
@@ -524,7 +524,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../../packages/core
       viem:
         specifier: ^2.21.3
@@ -561,7 +561,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../../packages/core
       viem:
         specifier: ^2.21.3
@@ -640,7 +640,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../../packages/core
       viem:
         specifier: ^2.21.3
@@ -692,7 +692,7 @@ importers:
         specifier: ^8.11.3
         version: 8.11.3
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../../packages/core
       viem:
         specifier: ^2.21.3
@@ -734,7 +734,7 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../../../packages/core
       viem:
         specifier: ^2.21.3
@@ -1092,7 +1092,7 @@ importers:
         specifier: ^8.15.6
         version: 8.16.2
       ponder:
-        specifier: workspace:@namehash/ponder@*
+        specifier: workspace:@ensnode/ponder@*
         version: link:../packages/core
       seedrandom:
         specifier: ^3.0.5

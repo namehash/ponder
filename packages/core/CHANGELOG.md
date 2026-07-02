@@ -1,11 +1,11 @@
-# @namehash/ponder
+# @ensnode/ponder
 
 ## 0.16.7
 
 ### Patch Changes
 
-- [#4](https://github.com/namehash/ponder/pull/4) [`01c2acd`](https://github.com/namehash/ponder/commit/01c2acdb880ea19df39b94072b52ecc44ee19022) Thanks [@sevenzing](https://github.com/sevenzing)! - Initial `@namehash/ponder` release: namehash fork of `ponder@0.16.6`. The published
-  package is aliased back to `ponder` by consumers (`"ponder": "npm:@namehash/ponder@<version>"`),
+- [#4](https://github.com/namehash/ponder/pull/4) [`01c2acd`](https://github.com/namehash/ponder/commit/01c2acdb880ea19df39b94072b52ecc44ee19022) Thanks [@sevenzing](https://github.com/sevenzing)! - Initial `@ensnode/ponder` release: namehash fork of `ponder@0.16.6`. The published
+  package is aliased back to `ponder` by consumers (`"ponder": "npm:@ensnode/ponder@<version>"`),
   so the CLI bin name stays `ponder`. Fork delta relative to upstream `ponder@0.16.6`
   (all changes are confined to `packages/core`; `@ponder/utils`/`@ponder/client` are
   unmodified and pulled from upstream):
