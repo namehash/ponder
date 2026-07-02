@@ -40,6 +40,14 @@ export type Options = {
   rpcMaxConcurrency: number;
 
   syncEventsQuerySize: number;
+
+  /**
+   * Maximum block gap (across all chains) below which user-defined indexes are
+   * preserved rather than dropped during crash recovery, provided the previous
+   * instance had completed initial sync (`is_ready === 1`).
+   * Controlled by `PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP` (default 10 000).
+   */
+  recreateIndexesMinBlockGap: number;
 };
 
 export const buildOptions = ({ cliOptions }: { cliOptions: CliOptions }) => {
@@ -126,5 +134,10 @@ export const buildOptions = ({ cliOptions }: { cliOptions: CliOptions }) => {
           1_024,
 
     syncEventsQuerySize: 12_000,
+
+    recreateIndexesMinBlockGap:
+      process.env.PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP !== undefined
+        ? Number(process.env.PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP)
+        : 10_000,
   } satisfies Options;
 };

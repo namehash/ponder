@@ -18,6 +18,15 @@ import type {
   PreBuild,
   SchemaBuild,
 } from "@/internal/types.js";
+export type MigrateResult = {
+  crashRecoveryCheckpoint: CrashRecoveryCheckpoint;
+  /**
+   * `false` when crash recovery decided to keep existing user-defined indexes
+   * (gap was small enough and the previous instance had completed initial sync).
+   * The runtime should skip `createIndexes` when this is `false`.
+   */
+  createIndexes: boolean;
+};
 import { buildMigrationProvider } from "@/sync-store/migrations.js";
 import * as PONDER_SYNC from "@/sync-store/schema.js";
 import { decodeCheckpoint } from "@/utils/checkpoint.js";
@@ -41,7 +50,7 @@ import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { Kysely, Migrator, PostgresDialect, WithSchemaPlugin } from "kysely";
 import type { Pool } from "pg";
 import prometheus from "prom-client";
-import { hexToBigInt } from "viem";
+import { hexToBigInt, hexToNumber } from "viem";
 import {
   crashRecovery,
   createLiveQueryProcedures,
@@ -61,7 +70,8 @@ export type Database = {
   /**
    * Migrate the user schema.
    *
-   * @returns The crash recovery checkpoint for each chain if there is a cache hit, else undefined.
+   * @returns `crashRecoveryCheckpoint` for each chain if there is a cache hit,
+   * plus `preserveIndexes` indicating whether user-defined indexes were kept.
    */
   migrate({
     buildId,
@@ -70,7 +80,7 @@ export type Database = {
   }: Pick<
     IndexingBuild,
     "buildId" | "chains" | "finalizedBlocks"
-  >): Promise<CrashRecoveryCheckpoint>;
+  >): Promise<MigrateResult>;
 };
 
 export const SCHEMATA = pgSchema("information_schema").table(
@@ -721,6 +731,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             return {
               status: "success",
               crashRecoveryCheckpoint: undefined,
+              indexesDropped: false,
             } as const;
           }
 
@@ -849,6 +860,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             return {
               status: "success",
               crashRecoveryCheckpoint: undefined,
+              indexesDropped: false,
             } as const;
           }
 
@@ -904,6 +916,7 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             return {
               status: "success",
               crashRecoveryCheckpoint: undefined,
+              indexesDropped: false,
             } as const;
           }
 
@@ -924,6 +937,42 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             chainId: c.chainId,
             checkpoint: c.safeCheckpoint,
           }));
+
+          // Compute the maximum block gap across all chains to decide whether
+          // user-defined indexes should be preserved or dropped.
+          const maxGapBlocks = Math.max(
+            0,
+            ...checkpoints.map((c) => {
+              const finalizedBlock =
+                finalizedBlocks[chains.findIndex((ch) => ch.id === c.chainId)];
+              if (finalizedBlock === undefined) return 0;
+              return Math.max(
+                0,
+                hexToNumber(finalizedBlock.number) -
+                  Number(decodeCheckpoint(c.safeCheckpoint).blockNumber),
+              );
+            }),
+          );
+
+          const hasCompletedInitialSync = previousApp.is_ready === 1;
+          const dropIndexes =
+            !hasCompletedInitialSync ||
+            maxGapBlocks > common.options.recreateIndexesMinBlockGap;
+
+          if (dropIndexes) {
+            common.logger.info({
+              msg: "Dropped database indexes during crash recovery",
+              max_gap_blocks: maxGapBlocks,
+              threshold: common.options.recreateIndexesMinBlockGap,
+              previous_is_ready: previousApp.is_ready,
+            });
+          } else {
+            common.logger.info({
+              msg: "Preserved database indexes during crash recovery",
+              max_gap_blocks: maxGapBlocks,
+              threshold: common.options.recreateIndexesMinBlockGap,
+            });
+          }
 
           // Note: The statements below will not affect chains that are not "live".
 
@@ -947,16 +996,18 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             );
           }
 
-          // Remove indexes
+          // Remove indexes (skipped when dropIndexes is false)
 
-          for (const indexStatement of schemaBuild.statements.indexes.json) {
-            await tx.wrap(
-              (tx) =>
-                tx.execute(
-                  `DROP INDEX IF EXISTS "${namespace.schema}"."${indexStatement.data.name}"`,
-                ),
-              context,
-            );
+          if (dropIndexes) {
+            for (const indexStatement of schemaBuild.statements.indexes.json) {
+              await tx.wrap(
+                (tx) =>
+                  tx.execute(
+                    `DROP INDEX IF EXISTS "${namespace.schema}"."${indexStatement.data.name}"`,
+                  ),
+                context,
+              );
+            }
           }
 
           for (const table of tables) {
@@ -970,7 +1021,11 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
             (tx) => tx.update(PONDER_META).set({ value: metadata }),
             context,
           );
-          return { status: "success", crashRecoveryCheckpoint } as const;
+          return {
+            status: "success",
+            crashRecoveryCheckpoint,
+            indexesDropped: dropIndexes,
+          } as const;
         });
 
       let result = await tryAcquireLockAndMigrate();
@@ -1023,7 +1078,10 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
         }
       }, common.options.databaseHeartbeatInterval);
 
-      return result.crashRecoveryCheckpoint;
+      return {
+        crashRecoveryCheckpoint: result.crashRecoveryCheckpoint,
+        createIndexes: result.indexesDropped,
+      };
     },
   };
 };

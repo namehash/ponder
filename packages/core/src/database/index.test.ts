@@ -573,7 +573,7 @@ test("migrate() with crash recovery reverts rows", async () => {
     },
   });
 
-  const checkpoint = await databaseTwo.migrate({
+  const migrateResult = await databaseTwo.migrate({
     buildId: "abc",
     chains: [getChain()],
     finalizedBlocks: [
@@ -586,13 +586,16 @@ test("migrate() with crash recovery reverts rows", async () => {
     ],
   });
 
-  expect(checkpoint).toMatchInlineSnapshot(`
-    [
-      {
-        "chainId": 1,
-        "checkpoint": "000000000000000000000000010000000000000010000000000000000000000000000000000",
-      },
-    ]
+  expect(migrateResult).toMatchInlineSnapshot(`
+    {
+      "crashRecoveryCheckpoint": [
+        {
+          "chainId": 1,
+          "checkpoint": "000000000000000000000000010000000000000010000000000000000000000000000000000",
+        },
+      ],
+      "createIndexes": true,
+    }
   `);
 
   const rows = await databaseTwo.userQB.wrap((db) =>
@@ -611,7 +614,114 @@ test("migrate() with crash recovery reverts rows", async () => {
   await context.common.shutdown.kill();
 });
 
-test("migrate() with crash recovery drops indexes and triggers", async () => {
+test("migrate() with crash recovery preserves indexes when gap is small and initial sync was completed", async () => {
+  const account = onchainTable(
+    "account",
+    (p) => ({
+      address: p.hex().primaryKey(),
+      balance: p.bigint(),
+    }),
+    (table) => ({
+      balanceIdx: index().on(table.balance),
+    }),
+  );
+
+  const database = createDatabase({
+    common: context.common,
+    namespace: {
+      schema: "public",
+      viewsSchema: undefined,
+    },
+    preBuild: {
+      databaseConfig: context.databaseConfig,
+      ordering: "multichain",
+    },
+    schemaBuild: {
+      schema: { account },
+      statements: buildSchema({
+        schema: { account },
+        preBuild: { ordering: "multichain" },
+      }).statements,
+    },
+  });
+
+  await database.migrate({
+    buildId: "abc",
+    chains: [],
+    finalizedBlocks: [],
+  });
+
+  await createIndexes(database.userQB, {
+    statements: buildSchema({
+      schema: { account },
+      preBuild: { ordering: "multichain" },
+    }).statements,
+  });
+
+  // safe_checkpoint block = 10; finalized block below will also be 10 → gap = 0
+  await database.userQB.wrap((db) =>
+    db.insert(getPonderCheckpointTable()).values({
+      chainId: 1,
+      chainName: "mainnet",
+      latestCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 10n }),
+      finalizedCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 10n }),
+      safeCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 10n }),
+    }),
+  );
+
+  await database.userQB.wrap((db) =>
+    db.update(getPonderMetaTable("public")).set({
+      value: sql`jsonb_set(value, '{is_ready}', to_jsonb(1))`,
+    }),
+  );
+
+  await context.common.shutdown.kill();
+
+  context.common.shutdown = createShutdown();
+
+  const databaseTwo = createDatabase({
+    common: context.common,
+    namespace: {
+      schema: "public",
+      viewsSchema: undefined,
+    },
+    preBuild: {
+      databaseConfig: context.databaseConfig,
+      ordering: "multichain",
+    },
+    schemaBuild: {
+      schema: { account },
+      statements: buildSchema({
+        schema: { account },
+        preBuild: { ordering: "multichain" },
+      }).statements,
+    },
+  });
+
+  const { createIndexes: shouldCreateIndexes } = await databaseTwo.migrate({
+    buildId: "abc",
+    chains: [getChain()],
+    // finalized block 10 = 0xa, safe_checkpoint block = 10 → gap = 0 ≤ 10_000
+    finalizedBlocks: [
+      {
+        timestamp: "0x1",
+        number: "0xa",
+        hash: "0x",
+        parentHash: "0x",
+      },
+    ],
+  });
+
+  expect(shouldCreateIndexes).toBe(false);
+
+  // Both the primary-key index and the custom balanceIdx survive (2 total).
+  const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
+  expect(indexNames).toHaveLength(2);
+
+  await context.common.shutdown.kill();
+});
+
+test("migrate() with crash recovery drops indexes when initial sync was not completed", async () => {
   const account = onchainTable(
     "account",
     (p) => ({
@@ -665,6 +775,111 @@ test("migrate() with crash recovery drops indexes and triggers", async () => {
     }),
   );
 
+  // is_ready stays 0 (initial sync never completed)
+
+  await context.common.shutdown.kill();
+
+  context.common.shutdown = createShutdown();
+
+  const databaseTwo = createDatabase({
+    common: context.common,
+    namespace: {
+      schema: "public",
+      viewsSchema: undefined,
+    },
+    preBuild: {
+      databaseConfig: context.databaseConfig,
+      ordering: "multichain",
+    },
+    schemaBuild: {
+      schema: { account },
+      statements: buildSchema({
+        schema: { account },
+        preBuild: { ordering: "multichain" },
+      }).statements,
+    },
+  });
+
+  const { createIndexes: shouldCreateIndexes } = await databaseTwo.migrate({
+    buildId: "abc",
+    chains: [getChain()],
+    finalizedBlocks: [
+      {
+        timestamp: "0x1",
+        number: "0xa",
+        hash: "0x",
+        parentHash: "0x",
+      },
+    ],
+  });
+
+  expect(shouldCreateIndexes).toBe(true);
+
+  // balanceIdx is dropped; only the primary-key index remains.
+  const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
+  expect(indexNames).toHaveLength(1);
+
+  await context.common.shutdown.kill();
+});
+
+test("migrate() with crash recovery drops indexes when gap exceeds threshold", async () => {
+  // Lower the threshold so a small gap still triggers the drop.
+  context.common.options.recreateIndexesMinBlockGap = 5;
+
+  const account = onchainTable(
+    "account",
+    (p) => ({
+      address: p.hex().primaryKey(),
+      balance: p.bigint(),
+    }),
+    (table) => ({
+      balanceIdx: index().on(table.balance),
+    }),
+  );
+
+  const database = createDatabase({
+    common: context.common,
+    namespace: {
+      schema: "public",
+      viewsSchema: undefined,
+    },
+    preBuild: {
+      databaseConfig: context.databaseConfig,
+      ordering: "multichain",
+    },
+    schemaBuild: {
+      schema: { account },
+      statements: buildSchema({
+        schema: { account },
+        preBuild: { ordering: "multichain" },
+      }).statements,
+    },
+  });
+
+  await database.migrate({
+    buildId: "abc",
+    chains: [],
+    finalizedBlocks: [],
+  });
+
+  await createIndexes(database.userQB, {
+    statements: buildSchema({
+      schema: { account },
+      preBuild: { ordering: "multichain" },
+    }).statements,
+  });
+
+  // safe_checkpoint block = 10
+  await database.userQB.wrap((db) =>
+    db.insert(getPonderCheckpointTable()).values({
+      chainId: 1,
+      chainName: "mainnet",
+      latestCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 10n }),
+      finalizedCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 10n }),
+      safeCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 10n }),
+    }),
+  );
+
   await database.userQB.wrap((db) =>
     db.update(getPonderMetaTable("public")).set({
       value: sql`jsonb_set(value, '{is_ready}', to_jsonb(1))`,
@@ -694,21 +909,24 @@ test("migrate() with crash recovery drops indexes and triggers", async () => {
     },
   });
 
-  await databaseTwo.migrate({
+  const { createIndexes: shouldCreateIndexes } = await databaseTwo.migrate({
     buildId: "abc",
     chains: [getChain()],
+    // finalized block 16 = 0x10, safe_checkpoint block = 10 → gap = 6 > threshold (5)
     finalizedBlocks: [
       {
         timestamp: "0x1",
-        number: "0xa",
+        number: "0x10",
         hash: "0x",
         parentHash: "0x",
       },
     ],
   });
 
-  const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
+  expect(shouldCreateIndexes).toBe(true);
 
+  // balanceIdx is dropped; only the primary-key index remains.
+  const indexNames = await getUserIndexNames(databaseTwo, "public", "account");
   expect(indexNames).toHaveLength(1);
 
   await context.common.shutdown.kill();

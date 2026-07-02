@@ -1,6 +1,6 @@
 import {
   commitBlock,
-  createIndexes,
+  createIndexes as createIndexesAction,
   createLiveQueryTriggers,
   createTriggers,
   createViews,
@@ -80,6 +80,7 @@ export async function runOmnichain({
   schemaBuild,
   indexingBuild,
   crashRecoveryCheckpoint,
+  createIndexes = true,
   database,
 }: {
   common: Common;
@@ -88,6 +89,7 @@ export async function runOmnichain({
   schemaBuild: SchemaBuild;
   indexingBuild: IndexingBuild;
   crashRecoveryCheckpoint: CrashRecoveryCheckpoint;
+  createIndexes?: boolean;
   database: Database;
 }) {
   const columnAccessPattern = createColumnAccessPattern({
@@ -570,13 +572,21 @@ export async function runOmnichain({
 
   let endClock = startClock();
 
-  await createIndexes(database.adminQB, { statements: schemaBuild.statements });
+  if (createIndexes) {
+    await createIndexesAction(database.adminQB, {
+      statements: schemaBuild.statements,
+    });
 
-  if (schemaBuild.statements.indexes.sql.length > 0) {
+    if (schemaBuild.statements.indexes.sql.length > 0) {
+      common.logger.info({
+        msg: "Created database indexes",
+        count: schemaBuild.statements.indexes.sql.length,
+        duration: endClock(),
+      });
+    }
+  } else {
     common.logger.info({
-      msg: "Created database indexes",
-      count: schemaBuild.statements.indexes.sql.length,
-      duration: endClock(),
+      msg: "Skipped database index creation (indexes preserved from crash recovery)",
     });
   }
 
