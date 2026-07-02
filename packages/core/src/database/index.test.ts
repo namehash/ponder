@@ -824,7 +824,7 @@ test("migrate() with crash recovery drops indexes when initial sync was not comp
 
 test("migrate() with crash recovery drops indexes when gap exceeds threshold", async () => {
   // Lower the threshold so a small gap still triggers the drop.
-  context.common.options.crashRecoveryIndexDropGap = 5;
+  context.common.options.recreateIndexesMinBlockGap = 5;
 
   const account = onchainTable(
     "account",

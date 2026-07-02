@@ -45,9 +45,9 @@ export type Options = {
    * Maximum block gap (across all chains) below which user-defined indexes are
    * preserved rather than dropped during crash recovery, provided the previous
    * instance had completed initial sync (`is_ready === 1`).
-   * Controlled by `PONDER_CRASH_RECOVERY_INDEX_DROP_GAP` (default 10 000).
+   * Controlled by `PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP` (default 10 000).
    */
-  crashRecoveryIndexDropGap: number;
+  recreateIndexesMinBlockGap: number;
 };
 
 export const buildOptions = ({ cliOptions }: { cliOptions: CliOptions }) => {
@@ -135,9 +135,9 @@ export const buildOptions = ({ cliOptions }: { cliOptions: CliOptions }) => {
 
     syncEventsQuerySize: 12_000,
 
-    crashRecoveryIndexDropGap:
-      process.env.PONDER_CRASH_RECOVERY_INDEX_DROP_GAP !== undefined
-        ? Number(process.env.PONDER_CRASH_RECOVERY_INDEX_DROP_GAP)
+    recreateIndexesMinBlockGap:
+      process.env.PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP !== undefined
+        ? Number(process.env.PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP)
         : 10_000,
   } satisfies Options;
 };

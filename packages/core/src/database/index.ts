@@ -957,20 +957,20 @@ CREATE TABLE IF NOT EXISTS "${namespace.schema}"."${PONDER_CHECKPOINT_TABLE_NAME
           const hasCompletedInitialSync = previousApp.is_ready === 1;
           const dropIndexes =
             !hasCompletedInitialSync ||
-            maxGapBlocks > common.options.crashRecoveryIndexDropGap;
+            maxGapBlocks > common.options.recreateIndexesMinBlockGap;
 
           if (dropIndexes) {
             common.logger.info({
               msg: "Dropped database indexes during crash recovery",
               max_gap_blocks: maxGapBlocks,
-              threshold: common.options.crashRecoveryIndexDropGap,
+              threshold: common.options.recreateIndexesMinBlockGap,
               previous_is_ready: previousApp.is_ready,
             });
           } else {
             common.logger.info({
               msg: "Preserved database indexes during crash recovery",
               max_gap_blocks: maxGapBlocks,
-              threshold: common.options.crashRecoveryIndexDropGap,
+              threshold: common.options.recreateIndexesMinBlockGap,
             });
           }
 
