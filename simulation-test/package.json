@@ -19,7 +19,7 @@
     "commander": "^12.0.0",
     "drizzle-orm": "0.41.0",
     "pg": "^8.15.6",
-    "ponder": "workspace:*",
+    "ponder": "workspace:@namehash/ponder@*",
     "seedrandom": "^3.0.5"
   }
 }

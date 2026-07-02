@@ -1,12 +1,16 @@
 {
-  "name": "ponder",
+  "name": "@namehash/ponder",
   "version": "0.16.6",
-  "description": "An open-source TypeScript framework for EVM data indexing",
+  "description": "An open-source TypeScript framework for EVM data indexing (namehash fork of ponder)",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ponder-sh/ponder",
+    "url": "https://github.com/namehash/ponder",
     "directory": "packages/core"
   },
   "files": [
@@ -62,7 +66,7 @@
     "@escape.tech/graphql-armor-max-depth": "^2.2.0",
     "@escape.tech/graphql-armor-max-tokens": "^2.3.0",
     "@hono/node-server": "1.19.5",
-    "@ponder/utils": "workspace:*",
+    "@ponder/utils": "0.2.18",
     "abitype": "^0.10.2",
     "ansi-escapes": "^7.0.0",
     "commander": "^12.0.0",

@@ -7,6 +7,19 @@
 
 Ponder is an open-source TypeScript framework for EVM data indexing.
 
+> **Note:** This repository is a fork of [ponder-sh/ponder](https://github.com/ponder-sh/ponder)
+> maintained by the [NameHash Labs](https://namehashlabs.org) team. We maintain this fork to carry a
+> set of fixes and improvements we need on top of upstream Ponder. The fork is published to npm as
+> [`@namehash/ponder`](https://www.npmjs.com/package/@namehash/ponder) and can be consumed as a
+> drop-in replacement by aliasing it back to `ponder`:
+>
+> ```jsonc
+> // package.json
+> "dependencies": {
+>   "ponder": "npm:@namehash/ponder@<version>"
+> }
+> ```
+
 ## Documentation
 
 Visit [ponder.sh](https://ponder.sh) for documentation, guides, and the API reference.
