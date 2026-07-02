@@ -11,7 +11,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "ponder": "workspace:@namehash/ponder@*",
+    "ponder": "workspace:@ensnode/ponder@*",
     "hono": "^4.5.0",
     "viem": "^2.21.3"
   },
