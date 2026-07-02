@@ -39,6 +39,9 @@ jobs:
           publish: pnpm changeset:release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Provenance (set via .npmrc `provenance=true`) is generated from this
+          # workflow's OIDC token, which requires `id-token: write` above.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   snapshot:
     if: github.event_name == 'workflow_dispatch'
@@ -55,6 +58,9 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Configure npm authentication
+        run: echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > "$HOME/.npmrc"
+
       - name: Build
         run: pnpm build
 
@@ -66,3 +72,4 @@ jobs:
           pnpm changeset publish --no-git-tag --snapshot $snapshot --tag $snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

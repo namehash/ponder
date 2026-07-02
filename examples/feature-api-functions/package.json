@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "hono": "^4.5.0",
-    "ponder": "workspace:*",
+    "ponder": "workspace:@namehash/ponder@*",
     "viem": "^2.21.3"
   },
   "devDependencies": {
