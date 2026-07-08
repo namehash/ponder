@@ -15,7 +15,7 @@ import type { RetryableError } from "@/internal/errors.js";
 import type { IndexingErrorHandler } from "@/internal/types.js";
 import { parseEther, zeroAddress } from "viem";
 import { beforeEach, expect, test } from "vitest";
-import { createIndexingCache } from "./cache.js";
+import { createIndexingCache, getCopyText } from "./cache.js";
 import { createIndexingStore } from "./index.js";
 
 beforeEach(setupCommon);
@@ -230,6 +230,7 @@ test("flush() encoding", async () => {
       bigint: p.bigint().notNull(),
       e: e().notNull(),
       array: p.integer().array().notNull(),
+      bytes: p.bytes().notNull(),
       json: p.json().notNull(),
       null: p.text(),
     })),
@@ -262,6 +263,7 @@ test("flush() encoding", async () => {
       bigint: 10n,
       e: "a",
       array: [1, 2, 4],
+      bytes: new Uint8Array([0, 128, 255, 1]),
       json: { a: 1, b: 2 },
       null: null,
     });
@@ -280,6 +282,12 @@ test("flush() encoding", async () => {
             4,
           ],
           "bigint": 10n,
+          "bytes": Uint8Array [
+            0,
+            128,
+            255,
+            1,
+          ],
           "e": "a",
           "hex": "0x0000000000000000000000000000000000000000",
           "json": {
@@ -352,6 +360,18 @@ test("flush() encoding escape", async () => {
 
     expect(result).toStrictEqual(values);
   });
+});
+
+test("getCopyText() encodes bytes", () => {
+  const schema = {
+    test: onchainTable("test", (p) => ({
+      bytes: p.bytes().primaryKey(),
+    })),
+  };
+
+  expect(
+    getCopyText(schema.test, [{ bytes: new Uint8Array([0, 128, 255, 1]) }]),
+  ).toBe("\\\\x0080ff01");
 });
 
 test("prefetch() uses profile metadata", async () => {
