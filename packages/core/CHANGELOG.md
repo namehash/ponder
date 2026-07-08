@@ -1,5 +1,11 @@
 # ponder
 
+## 0.16.8
+
+### Patch Changes
+
+- [#2317](https://github.com/ponder-sh/ponder/pull/2317) [`00b5073`](https://github.com/ponder-sh/ponder/commit/00b5073531ed439c505a907e88277fa0c7848b26) Thanks [@kyscott18](https://github.com/kyscott18)! - Fix realtime log syncing on async-execution chains with stale logs blooms.
+
 ## 0.16.7
 
 ### Patch Changes
