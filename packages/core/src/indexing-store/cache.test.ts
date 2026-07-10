@@ -258,20 +258,44 @@ test("flush() encoding", async () => {
     indexingCache.qb = tx;
     indexingStore.qb = tx;
 
-    await indexingStore.db.insert(schema.test).values({
-      hex: zeroAddress,
-      bigint: 10n,
-      e: "a",
-      array: [1, 2, 4],
-      bytes: new Uint8Array([0, 128, 255, 1]),
-      json: { a: 1, b: 2 },
-      null: null,
-    });
+    const values = [
+      {
+        hex: zeroAddress,
+        bigint: 10n,
+        e: "a" as const,
+        array: [1, 2, 4],
+        bytes: new Uint8Array([0, 128, 255, 1]),
+        json: { a: 1, b: 2 },
+        null: null,
+      },
+      {
+        hex: "0x0000000000000000000000000000000000000001" as const,
+        bigint: 11n,
+        e: "b" as const,
+        array: [],
+        bytes: new Uint8Array([]),
+        json: {},
+        null: null,
+      },
+      {
+        hex: "0x0000000000000000000000000000000000000002" as const,
+        bigint: 12n,
+        e: "c" as const,
+        array: [0],
+        bytes: new Uint8Array([0x5c, 0x4e, 0x09, 0x0a, 0x0d]),
+        json: { c: 3 },
+        null: null,
+      },
+    ];
+
+    await indexingStore.db.insert(schema.test).values(values);
 
     await indexingCache.flush();
 
     indexingCache.clear();
-    const result = await indexingStore.db.sql.select().from(schema.test);
+    const result = (await indexingStore.db.sql.select().from(schema.test)).sort(
+      (a, b) => a.hex.localeCompare(b.hex),
+    );
 
     expect(result).toMatchInlineSnapshot(`
       [
@@ -293,6 +317,34 @@ test("flush() encoding", async () => {
           "json": {
             "a": 1,
             "b": 2,
+          },
+          "null": null,
+        },
+        {
+          "array": [],
+          "bigint": 11n,
+          "bytes": Uint8Array [],
+          "e": "b",
+          "hex": "0x0000000000000000000000000000000000000001",
+          "json": {},
+          "null": null,
+        },
+        {
+          "array": [
+            0,
+          ],
+          "bigint": 12n,
+          "bytes": Uint8Array [
+            92,
+            78,
+            9,
+            10,
+            13,
+          ],
+          "e": "c",
+          "hex": "0x0000000000000000000000000000000000000002",
+          "json": {
+            "c": 3,
           },
           "null": null,
         },
@@ -370,8 +422,25 @@ test("getCopyText() encodes bytes", () => {
   };
 
   expect(
-    getCopyText(schema.test, [{ bytes: new Uint8Array([0, 128, 255, 1]) }]),
-  ).toBe("\\\\x0080ff01");
+    getCopyText(schema.test, [
+      { bytes: new Uint8Array([0, 128, 255, 1]) },
+      { bytes: new Uint8Array([]) },
+      { bytes: new Uint8Array([0x5c, 0x4e, 0x09, 0x0a, 0x0d]) },
+    ]),
+  ).toBe("\\\\x0080ff01\n\\\\x\n\\\\x5c4e090a0d");
+
+  const multiColumnSchema = {
+    test: onchainTable("test", (p) => ({
+      bytes: p.bytes().primaryKey(),
+      text: p.text().notNull(),
+    })),
+  };
+
+  expect(
+    getCopyText(multiColumnSchema.test, [
+      { bytes: new Uint8Array([0x5c, 0x4e, 0x09, 0x0a, 0x0d]), text: "ok" },
+    ]),
+  ).toBe("\\\\x5c4e090a0d\tok");
 });
 
 test("prefetch() uses profile metadata", async () => {
