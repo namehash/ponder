@@ -247,8 +247,10 @@ export const getCopyText = (table: Table, rows: Row[]) => {
             value = column.mapToDriverValue(value);
             if (value === null || value === undefined) {
               result += "\\N";
+            } else if (Buffer.isBuffer(value)) {
+              result += `\\\\x${value.toString("hex")}`;
             } else {
-              result += `${String(value).replace(ESCAPE_REGEX, "\\$1")}`;
+              result += String(value).replace(ESCAPE_REGEX, "\\$1");
             }
           }
         }
@@ -261,6 +263,8 @@ export const getCopyText = (table: Table, rows: Row[]) => {
           }
           if (value === null || value === undefined) {
             result += "\\N\t";
+          } else if (Buffer.isBuffer(value)) {
+            result += `\\\\x${value.toString("hex")}\t`;
           } else {
             result += `${String(value).replace(ESCAPE_REGEX, "\\$1")}\t`;
           }
