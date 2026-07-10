@@ -1,5 +1,11 @@
 # ponder
 
+## 0.16.9
+
+### Patch Changes
+
+- [#2323](https://github.com/ponder-sh/ponder/pull/2323) [`dee28aa`](https://github.com/ponder-sh/ponder/commit/dee28aa570cc457737a29508c9e7ded4d2431f5e) Thanks [@kyscott18](https://github.com/kyscott18)! - Fixed a bug with `p.bytes()` bytea encoding when flushing rows to Postgres with COPY that caused `DelayedInsertError: invalid byte sequence for encoding "UTF8": 0x00`.
+
 ## 0.16.8
 
 ### Patch Changes
