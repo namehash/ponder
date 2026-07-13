@@ -15,7 +15,7 @@ jobs:
         viem-version: ['1', '2']
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v3
@@ -23,7 +23,7 @@ jobs:
           version: 9.10.0
 
       - name: Install Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v5
         with:
           cache: pnpm
           node-version: latest

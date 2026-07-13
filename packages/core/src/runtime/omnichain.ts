@@ -749,22 +749,28 @@ export async function runOmnichain({
               }
             }
 
-            await tx.wrap(
-              { label: "update_checkpoints" },
-              (db) =>
-                db
-                  .update(PONDER_CHECKPOINT)
-                  .set({ latestCheckpoint: event.checkpoint })
-                  .where(eq(PONDER_CHECKPOINT.chainName, event.chain.name)),
-              context,
-            );
-
-            if (database.userQB.$dialect === "pglite") {
+            try {
               await tx.wrap(
-                (tx) =>
-                  tx.execute(`TRUNCATE TABLE ${getLiveQueryTempTableName()}`),
+                { label: "update_checkpoints" },
+                (db) =>
+                  db
+                    .update(PONDER_CHECKPOINT)
+                    .set({ latestCheckpoint: event.checkpoint })
+                    .where(eq(PONDER_CHECKPOINT.chainName, event.chain.name)),
                 context,
               );
+
+              if (database.userQB.$dialect === "pglite") {
+                await tx.wrap(
+                  (tx) =>
+                    tx.execute(`TRUNCATE TABLE ${getLiveQueryTempTableName()}`),
+                  context,
+                );
+              }
+            } catch (error) {
+              indexingCache.invalidate();
+              indexingCache.clear();
+              throw error;
             }
           },
           undefined,
