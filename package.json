@@ -4,7 +4,7 @@
     "bench:ponder:ci": "pnpm --filter \"./benchmarks\" bench:ponder:ci",
     "bench:subgraph:ci": "pnpm --filter \"./benchmarks\" bench:subgraph:ci",
     "build": "pnpm --filter \"./packages/**\" --recursive build",
-    "changeset:version": "changeset version && pnpm install --lockfile-only",
+    "changeset:version": "changeset version && pnpm install --lockfile-only && biome format package.json packages/*/package.json --write",
     "changeset:release": "pnpm build && changeset publish",
     "format": "biome format . --write",
     "lint": "biome check .",
