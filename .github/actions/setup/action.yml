@@ -11,17 +11,17 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Set up pnpm
-      uses: pnpm/action-setup@v3
-      with:
-        version: 9.10.0
-
     - name: Set up node
       uses: actions/setup-node@v5
       with:
-        cache: pnpm
         node-version: 24.8
         registry-url: 'https://registry.npmjs.org'
+
+    - name: Set up pnpm
+      shell: bash
+      run: |
+        npm install --global --prefix "$RUNNER_TEMP/setup-pnpm" pnpm@9.10.0
+        echo "$RUNNER_TEMP/setup-pnpm/bin" >> "$GITHUB_PATH"
 
     - name: Set up foundry
       if: inputs.foundry == 'true'
