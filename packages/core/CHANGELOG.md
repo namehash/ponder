@@ -1,5 +1,11 @@
 # ponder
 
+## 0.16.10
+
+### Patch Changes
+
+- [#2325](https://github.com/ponder-sh/ponder/pull/2325) [`18b2bb2`](https://github.com/ponder-sh/ponder/commit/18b2bb2371c2236a724cef1eecd6e6469635b3ac) Thanks [@kyscott18](https://github.com/kyscott18)! - Fixed a bug that could cause incorrect indexed data when a database error occurs during live indexing.
+
 ## 0.16.9
 
 ### Patch Changes
