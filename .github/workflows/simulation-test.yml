@@ -83,7 +83,7 @@ jobs:
           - "uniswap-v4"
           - "the-compact"
           - "basepaint"
-        iteration: [0, 1]
+        iteration: [0, 1, 2]
 
     steps:
       - uses: actions/checkout@v5

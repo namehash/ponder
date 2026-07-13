@@ -101,7 +101,7 @@ SEED="reference-erc20-local-smoke" pnpm test reference-erc20 -- --log-level info
 ## Infra / Railway / Monitoring CI
 - Scheduled CI is defined in `.github/workflows/simulation-test.yml`.
 - The fuzz workflow currently runs four times per day with cron `0 0,6,12,18 * * *`.
-- The scheduled matrix runs each configured app for two iterations. The `iteration` value is only a matrix label; it does not seed the test.
+- The scheduled matrix runs each configured app for three iterations. The `iteration` value is only a matrix label; it does not seed the test.
 - The same workflow includes known-failure seeds, but that job only runs on manual `workflow_dispatch`.
 - One-off reproductions in CI use `.github/workflows/simulation-test-single.yml`, which accepts an app and seed.
 - CI runs on self-hosted runners and uses GitHub secrets for `DATABASE_URL` and RPC URLs. Current workflow env sets `PGDATABASE=railway`, indicating the shared Postgres service is Railway-backed.
