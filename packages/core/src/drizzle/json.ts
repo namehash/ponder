@@ -1,4 +1,3 @@
-import { type BaseError, BigIntSerializationError } from "@/internal/errors.js";
 import { type ColumnBaseConfig, entityKind } from "drizzle-orm";
 import type {
   ColumnBuilderBaseConfig,
@@ -10,6 +9,7 @@ import {
   PgColumn,
   PgColumnBuilder,
 } from "drizzle-orm/pg-core";
+import { type BaseError, BigIntSerializationError } from "@/internal/errors.js";
 
 export type PgJsonBuilderInitial<TName extends string> = PgJsonBuilder<{
   name: TName;
@@ -23,14 +23,14 @@ export type PgJsonBuilderInitial<TName extends string> = PgJsonBuilder<{
 export class PgJsonBuilder<
   T extends ColumnBuilderBaseConfig<"json", "PgJson">,
 > extends PgColumnBuilder<T> {
-  static readonly [entityKind]: string = "PgJsonBuilder";
+  static override readonly [entityKind]: string = "PgJsonBuilder";
 
   constructor(name: T["name"]) {
     super(name, "json", "PgJson");
   }
 
   /** @internal */
-  // @ts-ignore
+  // @ts-expect-error
   override build<TTableName extends string>(
     table: AnyPgTable<{ name: TTableName }>,
   ): PgJson<MakeColumnConfig<T, TTableName>> {
@@ -44,7 +44,7 @@ export class PgJsonBuilder<
 export class PgJson<
   T extends ColumnBaseConfig<"json", "PgJson">,
 > extends PgColumn<T> {
-  static readonly [entityKind]: string = "PgJson";
+  static override readonly [entityKind]: string = "PgJson";
 
   getSQLType(): string {
     return "json";
@@ -102,7 +102,7 @@ export class PgJsonbBuilder<
   }
 
   /** @internal */
-  // @ts-ignore
+  // @ts-expect-error
   override build<TTableName extends string>(
     table: AnyPgTable<{ name: TTableName }>,
   ): PgJsonb<MakeColumnConfig<T, TTableName>> {
@@ -118,7 +118,7 @@ export class PgJsonb<
 > extends PgColumn<T> {
   static override readonly [entityKind]: string = "PgJsonb";
 
-  // biome-ignore lint/complexity/noUselessConstructor: <explanation>
+  // biome-ignore lint/complexity/noUselessConstructor: The constructor preserves the generated Drizzle subclass shape.
   constructor(
     table: AnyPgTable<{ name: T["tableName"] }>,
     config: PgJsonbBuilder<T>["config"],

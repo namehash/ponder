@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
 import { createBuild } from "@/build/index.js";
 import {
+  createDatabase,
+  getPonderMetaTable,
   PONDER_CHECKPOINT_TABLE_NAME,
   PONDER_META_TABLE_NAME,
   type PonderApp0,
@@ -10,8 +13,6 @@ import {
   type PonderApp5,
   type PonderApp6,
   SCHEMATA,
-  createDatabase,
-  getPonderMetaTable,
 } from "@/database/index.js";
 import {
   getLiveQueryChannelName,
@@ -24,9 +25,7 @@ import { createLogger } from "@/internal/logger.js";
 import { MetricsService } from "@/internal/metrics.js";
 import { buildOptions } from "@/internal/options.js";
 import { createShutdown } from "@/internal/shutdown.js";
-import { createTelemetry } from "@/internal/telemetry.js";
 import { startClock } from "@/utils/timer.js";
-import { eq } from "drizzle-orm";
 import type { CliOptions } from "../ponder.js";
 import { createExit } from "../utils/exit.js";
 
@@ -58,12 +57,10 @@ export async function createViews({
 
   const metrics = new MetricsService();
   const shutdown = createShutdown();
-  const telemetry = createTelemetry({ options, logger, shutdown });
   const common = {
     options,
     logger,
     metrics,
-    telemetry,
     shutdown,
     buildShutdown: shutdown,
     apiShutdown: shutdown,

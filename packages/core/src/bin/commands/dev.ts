@@ -1,14 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createBuild } from "@/build/index.js";
-import { type Database, createDatabase } from "@/database/index.js";
+import { createDatabase, type Database } from "@/database/index.js";
 import type { Common } from "@/internal/common.js";
 import { NonRetryableUserError, ShutdownError } from "@/internal/errors.js";
 import { createLogger } from "@/internal/logger.js";
 import { MetricsService } from "@/internal/metrics.js";
 import { buildOptions } from "@/internal/options.js";
 import { createShutdown } from "@/internal/shutdown.js";
-import { buildPayload, createTelemetry } from "@/internal/telemetry.js";
 import type {
   CrashRecoveryCheckpoint,
   IndexingBuild,
@@ -33,14 +32,12 @@ export async function dev({ cliOptions }: { cliOptions: CliOptions }) {
     mode: options.logFormat,
   });
 
-  const [major, minor, _patch] = process.versions.node
-    .split(".")
-    .map(Number) as [number, number, number];
-  if (major < 18 || (major === 18 && minor < 14)) {
+  const major = Number(process.versions.node.split(".")[0]);
+  if (major < 22) {
     logger.error({
       msg: "Invalid Node.js version",
       version: process.versions.node,
-      expected: "18.14",
+      expected: "22",
     });
     process.exit(1);
   }
@@ -60,9 +57,6 @@ export async function dev({ cliOptions }: { cliOptions: CliOptions }) {
     apiShutdown: createShutdown(),
     buildShutdown: createShutdown(),
   } as Common;
-
-  const telemetry = createTelemetry(common);
-  common.telemetry = telemetry;
 
   if (options.version) {
     metrics.ponder_version_info.set(
@@ -321,21 +315,7 @@ export async function dev({ cliOptions }: { cliOptions: CliOptions }) {
           return;
         }
 
-        if (isInitialBuild) {
-          isInitialBuild = false;
-
-          telemetry.record({
-            name: "lifecycle:session_start",
-            properties: {
-              cli_command: "dev",
-              ...buildPayload({
-                preBuild: preCompileResult.result,
-                schemaBuild: compileSchemaResult.result,
-                indexingBuild: indexingBuildResult.result,
-              }),
-            },
-          });
-        }
+        isInitialBuild = false;
 
         metrics.resetApiMetrics();
         metrics.ponder_settings_info.set(

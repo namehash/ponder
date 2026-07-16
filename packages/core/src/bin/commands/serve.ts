@@ -1,12 +1,11 @@
+import { eq } from "drizzle-orm";
 import { createBuild } from "@/build/index.js";
-import { SCHEMATA, createDatabase } from "@/database/index.js";
+import { createDatabase, SCHEMATA } from "@/database/index.js";
 import { createLogger } from "@/internal/logger.js";
 import { MetricsService } from "@/internal/metrics.js";
 import { buildOptions } from "@/internal/options.js";
 import { createShutdown } from "@/internal/shutdown.js";
-import { buildPayload, createTelemetry } from "@/internal/telemetry.js";
 import { createServer } from "@/server/index.js";
-import { eq } from "drizzle-orm";
 import type { CliOptions } from "../ponder.js";
 import { createExit } from "../utils/exit.js";
 
@@ -18,26 +17,22 @@ export async function serve({ cliOptions }: { cliOptions: CliOptions }) {
     mode: options.logFormat,
   });
 
-  const [major, minor, _patch] = process.versions.node
-    .split(".")
-    .map(Number) as [number, number, number];
-  if (major < 18 || (major === 18 && minor < 14)) {
+  const major = Number(process.versions.node.split(".")[0]);
+  if (major < 22) {
     logger.error({
       msg: "Invalid Node.js version",
       version: process.versions.node,
-      expected: "18.14",
+      expected: "22",
     });
     process.exit(1);
   }
 
   const metrics = new MetricsService();
   const shutdown = createShutdown();
-  const telemetry = createTelemetry({ options, logger, shutdown });
   const common = {
     options,
     logger,
     metrics,
-    telemetry,
     shutdown,
     buildShutdown: shutdown,
     apiShutdown: shutdown,
@@ -210,17 +205,6 @@ export async function serve({ cliOptions }: { cliOptions: CliOptions }) {
     await exit({ code: 1 });
     return;
   }
-
-  telemetry.record({
-    name: "lifecycle:session_start",
-    properties: {
-      cli_command: "serve",
-      ...buildPayload({
-        preBuild: preCompileResult.result,
-        schemaBuild: compileSchemaResult.result,
-      }),
-    },
-  });
 
   metrics.ponder_settings_info.set(
     {

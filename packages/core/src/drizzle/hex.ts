@@ -2,8 +2,8 @@ import {
   type ColumnBaseConfig,
   type ColumnBuilderBaseConfig,
   type ColumnBuilderRuntimeConfig,
-  type MakeColumnConfig,
   entityKind,
+  type MakeColumnConfig,
 } from "drizzle-orm";
 import {
   type AnyPgTable,
@@ -24,14 +24,14 @@ export type PgHexBuilderInitial<TName extends string> = PgHexBuilder<{
 export class PgHexBuilder<
   T extends ColumnBuilderBaseConfig<"string", "PgHex">,
 > extends PgColumnBuilder<T> {
-  static readonly [entityKind]: string = "PgHexBuilder";
+  static override readonly [entityKind]: string = "PgHexBuilder";
 
   constructor(name: T["name"]) {
     super(name, "string", "PgHex");
   }
 
   /** @internal */
-  // @ts-ignore
+  // @ts-expect-error
   override build<TTableName extends string>(
     table: AnyPgTable<{ name: TTableName }>,
   ): PgHex<MakeColumnConfig<T, TTableName>> {
@@ -45,7 +45,7 @@ export class PgHexBuilder<
 export class PgHex<
   T extends ColumnBaseConfig<"string", "PgHex">,
 > extends PgColumn<T> {
-  static readonly [entityKind]: string = "PgHex";
+  static override readonly [entityKind]: string = "PgHex";
 
   getSQLType(): string {
     return "text";

@@ -10,7 +10,6 @@
     "preview": "vocs preview"
   },
   "dependencies": {
-    "@clickhouse/client": "1.11.0",
     "@theguild/remark-mermaid": "^0.3.0",
     "@vercel/node": "^5.1.16",
     "@vercel/og": "^0.6.8",
@@ -25,8 +24,8 @@
     "vocs": "^1.0.11"
   },
   "devDependencies": {
-    "@types/node": "^22.15.18",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^18"
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.0.10"
   }
 }

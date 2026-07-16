@@ -1,4 +1,24 @@
 import crypto from "node:crypto";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
+import {
+  type PgColumn,
+  type PgSelectBase,
+  unionAll,
+} from "drizzle-orm/pg-core";
+import { type Address, hexToNumber, isHex } from "viem";
 import type { QB } from "@/database/queryBuilder.js";
 import { extractBlockNumberParam } from "@/indexing/client.js";
 import type { Common } from "@/internal/common.js";
@@ -49,30 +69,9 @@ import type {
   IntervalWithFilter,
 } from "@/runtime/index.js";
 import type { Interval } from "@/utils/interval.js";
-import { intervalUnion } from "@/utils/interval.js";
 import { toLowerCase } from "@/utils/lowercase.js";
 import { orderObject } from "@/utils/order.js";
 import { startClock } from "@/utils/timer.js";
-import {
-  type SQL,
-  and,
-  asc,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lt,
-  lte,
-  or,
-  sql,
-} from "drizzle-orm";
-import {
-  type PgColumn,
-  type PgSelectBase,
-  unionAll,
-} from "drizzle-orm/pg-core";
-import { type Address, hexToNumber, isHex } from "viem";
 import {
   encodeBlock,
   encodeLog,
@@ -203,7 +202,10 @@ export type SyncStore = {
 export const createSyncStore = ({
   common,
   qb,
-}: { common: Common; qb: QB<typeof PONDER_SYNC> }): SyncStore => {
+}: {
+  common: Common;
+  qb: QB<typeof PONDER_SYNC>;
+}): SyncStore => {
   const syncStore = {
     insertIntervals: async (
       { intervals, factoryIntervals, chainId },
@@ -419,31 +421,6 @@ export const createSyncStore = ({
             index += 1;
 
             result.get(factory)!.push({ fragment, intervals });
-          }
-
-          // Note: This is a stand-in for a migration to the `intervals` table
-          // required in `v0.15`. It is an invariant that filter with factories
-          // have a row in the intervals table for both the filter and the factory.
-          // If this invariant is broken, it must be because of the migration from
-          // `v0.14` to `v0.15`. In this case, we can assume that the factory interval
-          // is the same as the filter interval.
-
-          const filterIntervals = intervalUnion(
-            result.get(filter)!.flatMap(({ intervals }) => intervals),
-          );
-          const factoryIntervals = intervalUnion(
-            result.get(factory)!.flatMap(({ intervals }) => intervals),
-          );
-
-          if (
-            filterIntervals.length > 0 &&
-            factoryIntervals.length === 0 &&
-            filter.fromBlock === factory.fromBlock &&
-            filter.toBlock === factory.toBlock
-          ) {
-            for (const factoryInterval of result.get(factory)!) {
-              factoryInterval.intervals = filterIntervals;
-            }
           }
         }
       }
@@ -835,7 +812,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeBlock(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         blockSelect[column] = PONDER_SYNC.blocks[column];
       }
 
@@ -862,7 +839,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeTransaction(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         transactionSelect[column] = PONDER_SYNC.transactions[column];
       }
 
@@ -891,7 +868,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeTransactionReceipt(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         transactionReceiptSelect[column] =
           PONDER_SYNC.transactionReceipts[column];
       }
@@ -926,7 +903,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeTrace(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         traceSelect[column] = PONDER_SYNC.traces[column];
       }
 
@@ -1213,19 +1190,19 @@ export const createSyncStore = ({
         internalLog.address = toLowerCase(log.address);
         internalLog.removed = false;
         internalLog.topics = [
-          // @ts-ignore
+          // @ts-expect-error
           log.topic0,
           log.topic1,
           log.topic2,
           log.topic3,
         ];
-        // @ts-ignore
+        // @ts-expect-error
         log.topic0 = undefined;
-        // @ts-ignore
+        // @ts-expect-error
         log.topic1 = undefined;
-        // @ts-ignore
+        // @ts-expect-error
         log.topic2 = undefined;
-        // @ts-ignore
+        // @ts-expect-error
         log.topic3 = undefined;
       }
 
@@ -1499,9 +1476,7 @@ const addressFilter = (
 ): SQL => {
   // `factory` filtering is handled in-memory
   if (isAddressFactory(address)) return sql`true`;
-  // @ts-ignore
   if (Array.isArray(address)) return inArray(column, address);
-  // @ts-ignore
   if (typeof address === "string") return eq(column, address);
   return sql`true`;
 };
