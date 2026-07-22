@@ -1,3 +1,7 @@
+import { and, eq, sql } from "drizzle-orm";
+import { index } from "drizzle-orm/pg-core";
+import { zeroAddress } from "viem";
+import { beforeEach, expect, test } from "vitest";
 import {
   setupCleanup,
   setupCommon,
@@ -6,22 +10,24 @@ import {
 } from "@/_test/setup.js";
 import { buildSchema } from "@/build/schema.js";
 import { getReorgTable } from "@/drizzle/kit/index.js";
-import { onchainTable, primaryKey } from "@/drizzle/onchain.js";
+import {
+  getLiveQueryChannelName,
+  getLiveQueryTempTableName,
+  onchainTable,
+  primaryKey,
+} from "@/drizzle/onchain.js";
 import type { RetryableError } from "@/internal/errors.js";
 import type { IndexingErrorHandler } from "@/internal/types.js";
 import {
   type Checkpoint,
+  encodeCheckpoint,
   MAX_CHECKPOINT_STRING,
   ZERO_CHECKPOINT,
-  encodeCheckpoint,
 } from "@/utils/checkpoint.js";
-import { and, eq, sql } from "drizzle-orm";
-import { index } from "drizzle-orm/pg-core";
-import { zeroAddress } from "viem";
-import { beforeEach, expect, test } from "vitest";
 import {
   commitBlock,
   createIndexes,
+  createLiveQueryTriggers,
   createTriggers,
   createViews,
   dropTriggers,
@@ -43,15 +49,15 @@ function createCheckpoint(checkpoint: Partial<Checkpoint>): string {
   return encodeCheckpoint({ ...ZERO_CHECKPOINT, ...checkpoint });
 }
 
-const indexingErrorHandler: IndexingErrorHandler = {
+const _indexingErrorHandler: IndexingErrorHandler = {
   getRetryableError: () => {
-    return indexingErrorHandler.error;
+    return _indexingErrorHandler.error;
   },
   setRetryableError: (error: RetryableError) => {
-    indexingErrorHandler.error = error;
+    _indexingErrorHandler.error = error;
   },
   clearRetryableError: () => {
-    indexingErrorHandler.error = undefined;
+    _indexingErrorHandler.error = undefined;
   },
   error: undefined as RetryableError | undefined,
 };
@@ -174,6 +180,124 @@ test("createTriggers() duplicate", async () => {
 
   await createTriggers(database.userQB, { tables: [account] });
   await createTriggers(database.userQB, { tables: [account] });
+});
+
+test("live query notify trigger batches large payloads", async () => {
+  const { database } = await setupDatabaseServices({
+    schemaBuild: { schema: { account } },
+  });
+
+  await database.userQB.wrap((tx) =>
+    tx.insert(getPonderCheckpointTable()).values({
+      chainName: "mainnet",
+      chainId: 1,
+      safeCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 0n }),
+      finalizedCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 0n }),
+      latestCheckpoint: createCheckpoint({ chainId: 1n, blockNumber: 0n }),
+    }),
+  );
+
+  await createLiveQueryTriggers(database.userQB, {
+    tables: [],
+    namespaceBuild: { schema: "public", viewsSchema: undefined },
+  });
+
+  const channel = getLiveQueryChannelName("public");
+  const notifications: string[] = [];
+  let resolve!: () => void;
+  const done = new Promise<void>((_resolve) => {
+    resolve = _resolve;
+  });
+  const onNotification = (payload: string | undefined) => {
+    if (payload === undefined) return;
+    notifications.push(payload);
+    if (notifications.length >= 2) resolve();
+  };
+
+  if (database.driver.dialect === "pglite") {
+    await database.driver.instance.query(`LISTEN "${channel}"`);
+    database.driver.instance.onNotification((_, payload) =>
+      onNotification(payload),
+    );
+  }
+
+  const client =
+    database.driver.dialect === "postgres"
+      ? await database.driver.admin.connect()
+      : undefined;
+
+  try {
+    if (client) {
+      client.on("notification", (notification) =>
+        onNotification(notification.payload),
+      );
+      await client.query(`LISTEN "${channel}"`);
+    }
+
+    await database.userQB.transaction(async (tx) => {
+      if (database.userQB.$dialect === "postgres") {
+        await tx.wrap((tx) =>
+          tx.execute(`DROP TABLE IF EXISTS ${getLiveQueryTempTableName()}`),
+        );
+        await tx.wrap((tx) =>
+          tx.execute(
+            `CREATE TEMP TABLE ${getLiveQueryTempTableName()} (table_name TEXT PRIMARY KEY) ON COMMIT DROP`,
+          ),
+        );
+      } else {
+        await tx.wrap((tx) =>
+          tx.execute(
+            `CREATE TEMP TABLE IF NOT EXISTS ${getLiveQueryTempTableName()} (table_name TEXT PRIMARY KEY)`,
+          ),
+        );
+        await tx.wrap((tx) =>
+          tx.execute(`TRUNCATE TABLE ${getLiveQueryTempTableName()}`),
+        );
+      }
+
+      const tableNames = Array.from(
+        { length: 160 },
+        (_, i) => `table_${i.toString().padStart(3, "0")}_${"x".repeat(48)}`,
+      );
+
+      await tx.wrap((tx) =>
+        tx.execute(
+          `INSERT INTO ${getLiveQueryTempTableName()} (table_name) VALUES ${tableNames
+            .map((tableName) => `('${tableName}')`)
+            .join(",")}`,
+        ),
+      );
+
+      await tx.wrap((tx) =>
+        tx
+          .update(getPonderCheckpointTable())
+          .set({
+            latestCheckpoint: createCheckpoint({
+              chainId: 1n,
+              blockNumber: 1n,
+            }),
+          })
+          .where(eq(getPonderCheckpointTable().chainName, "mainnet")),
+      );
+    });
+
+    await done;
+  } finally {
+    if (database.driver.dialect === "pglite") {
+      await database.driver.instance.query(`UNLISTEN "${channel}"`);
+    } else if (client) {
+      await client.query(`UNLISTEN "${channel}"`);
+      client.release();
+    }
+  }
+
+  expect(notifications.length).toBeGreaterThan(1);
+  expect(notifications.flatMap((payload) => JSON.parse(payload))).toHaveLength(
+    160,
+  );
+  expect(
+    notifications.every((payload) => Buffer.byteLength(payload) < 8000),
+  ).toBe(true);
 });
 
 test("commitBlock()", async () => {

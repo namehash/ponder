@@ -1,3 +1,13 @@
+import {
+  getTableColumns,
+  getTableName,
+  isTable,
+  or,
+  sql,
+  type Table,
+} from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
+import copy from "pg-copy-streams";
 import type { QB } from "@/database/queryBuilder.js";
 import { getPrimaryKeyColumns } from "@/drizzle/index.js";
 import { getColumnCasing } from "@/drizzle/kit/index.js";
@@ -19,16 +29,6 @@ import { prettyPrint } from "@/utils/print.js";
 import { promiseAllSettledWithThrow } from "@/utils/promiseAllSettledWithThrow.js";
 import { startClock } from "@/utils/timer.js";
 import {
-  type Table,
-  getTableColumns,
-  getTableName,
-  isTable,
-  or,
-  sql,
-} from "drizzle-orm";
-import { getTableConfig } from "drizzle-orm/pg-core";
-import copy from "pg-copy-streams";
-import {
   getProfilePatternKey,
   recordProfilePattern,
   recoverProfilePattern,
@@ -48,10 +48,10 @@ export type IndexingCache = {
   /**
    * Returns the entry for `table` with `key`.
    */
-  get: (params: { table: Table; key: object }) =>
-    | Row
-    | null
-    | Promise<Row | null>;
+  get: (params: {
+    table: Table;
+    key: object;
+  }) => Row | null | Promise<Row | null>;
   /**
    * Sets the entry for `table` with `key` to `row`.
    */
@@ -247,8 +247,10 @@ export const getCopyText = (table: Table, rows: Row[]) => {
             value = column.mapToDriverValue(value);
             if (value === null || value === undefined) {
               result += "\\N";
+            } else if (Buffer.isBuffer(value)) {
+              result += `\\\\x${value.toString("hex")}`;
             } else {
-              result += `${String(value).replace(ESCAPE_REGEX, "\\$1")}`;
+              result += String(value).replace(ESCAPE_REGEX, "\\$1");
             }
           }
         }
@@ -261,6 +263,8 @@ export const getCopyText = (table: Table, rows: Row[]) => {
           }
           if (value === null || value === undefined) {
             result += "\\N\t";
+          } else if (Buffer.isBuffer(value)) {
+            result += `\\\\x${value.toString("hex")}\t`;
           } else {
             result += `${String(value).replace(ESCAPE_REGEX, "\\$1")}\t`;
           }
@@ -646,7 +650,7 @@ export const createIndexingCache = ({
                   .insert(table)
                   .values(updateValues.map(({ row }) => row))
                   .onConflictDoUpdate({
-                    // @ts-ignore
+                    // @ts-expect-error
                     target: primaryKeys.map(({ js }) => table[js]!),
                     set: Object.fromEntries(
                       Object.entries(getTableColumns(table)).map(

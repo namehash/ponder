@@ -110,10 +110,7 @@ export const sidebar = {
     },
     {
       text: "Advanced",
-      items: [
-        { text: "Observability", link: "/docs/advanced/observability" },
-        { text: "Telemetry", link: "/docs/advanced/telemetry" },
-      ],
+      items: [{ text: "Observability", link: "/docs/advanced/observability" }],
     },
   ],
   "/docs/0.15/": [
@@ -148,7 +145,10 @@ export const sidebar = {
       items: [
         { text: "Overview", link: "/docs/0.15/indexing/overview" },
         { text: "Write to the database", link: "/docs/0.15/indexing/write" },
-        { text: "Read contract data", link: "/docs/0.15/indexing/read-contracts" },
+        {
+          text: "Read contract data",
+          link: "/docs/0.15/indexing/read-contracts",
+        },
       ],
     },
     {
@@ -176,7 +176,10 @@ export const sidebar = {
       text: "Guides",
       items: [
         { text: "Factory pattern", link: "/docs/0.15/guides/factory" },
-        { text: "Isolated indexing", link: "/docs/0.15/guides/isolated-indexing" },
+        {
+          text: "Isolated indexing",
+          link: "/docs/0.15/guides/isolated-indexing",
+        },
         { text: "Call traces", link: "/docs/0.15/guides/call-traces" },
         { text: "Transaction receipts", link: "/docs/0.15/guides/receipts" },
         { text: "Time-series data", link: "/docs/0.15/guides/time-series" },
@@ -187,7 +190,10 @@ export const sidebar = {
     {
       text: "API reference",
       items: [
-        { text: "create-ponder", link: "/docs/0.15/api-reference/create-ponder" },
+        {
+          text: "create-ponder",
+          link: "/docs/0.15/api-reference/create-ponder",
+        },
         {
           text: "ponder",
           items: [
@@ -217,16 +223,24 @@ export const sidebar = {
             },
           ],
         },
-        { text: "@ponder/client", link: "/docs/0.15/api-reference/ponder-client" },
-        { text: "@ponder/react", link: "/docs/0.15/api-reference/ponder-react" },
-        { text: "@ponder/utils", link: "/docs/0.15/api-reference/ponder-utils" },
+        {
+          text: "@ponder/client",
+          link: "/docs/0.15/api-reference/ponder-client",
+        },
+        {
+          text: "@ponder/react",
+          link: "/docs/0.15/api-reference/ponder-react",
+        },
+        {
+          text: "@ponder/utils",
+          link: "/docs/0.15/api-reference/ponder-utils",
+        },
       ],
     },
     {
       text: "Advanced",
       items: [
         { text: "Observability", link: "/docs/0.15/advanced/observability" },
-        { text: "Telemetry", link: "/docs/0.15/advanced/telemetry" },
       ],
     },
   ],
@@ -262,7 +276,10 @@ export const sidebar = {
       items: [
         { text: "Overview", link: "/docs/0.14/indexing/overview" },
         { text: "Write to the database", link: "/docs/0.14/indexing/write" },
-        { text: "Read contract data", link: "/docs/0.14/indexing/read-contracts" },
+        {
+          text: "Read contract data",
+          link: "/docs/0.14/indexing/read-contracts",
+        },
       ],
     },
     {
@@ -300,7 +317,10 @@ export const sidebar = {
     {
       text: "API reference",
       items: [
-        { text: "create-ponder", link: "/docs/0.14/api-reference/create-ponder" },
+        {
+          text: "create-ponder",
+          link: "/docs/0.14/api-reference/create-ponder",
+        },
         {
           text: "ponder",
           items: [
@@ -330,16 +350,24 @@ export const sidebar = {
             },
           ],
         },
-        { text: "@ponder/client", link: "/docs/0.14/api-reference/ponder-client" },
-        { text: "@ponder/react", link: "/docs/0.14/api-reference/ponder-react" },
-        { text: "@ponder/utils", link: "/docs/0.14/api-reference/ponder-utils" },
+        {
+          text: "@ponder/client",
+          link: "/docs/0.14/api-reference/ponder-client",
+        },
+        {
+          text: "@ponder/react",
+          link: "/docs/0.14/api-reference/ponder-react",
+        },
+        {
+          text: "@ponder/utils",
+          link: "/docs/0.14/api-reference/ponder-utils",
+        },
       ],
     },
     {
       text: "Advanced",
       items: [
         { text: "Observability", link: "/docs/0.14/advanced/observability" },
-        { text: "Telemetry", link: "/docs/0.14/advanced/telemetry" },
       ],
     },
   ],
@@ -374,7 +402,10 @@ export const sidebar = {
       items: [
         { text: "Overview", link: "/docs/0.12/indexing/overview" },
         { text: "Write to the database", link: "/docs/0.12/indexing/write" },
-        { text: "Read contract data", link: "/docs/0.12/indexing/read-contracts" },
+        {
+          text: "Read contract data",
+          link: "/docs/0.12/indexing/read-contracts",
+        },
       ],
     },
     {
@@ -412,7 +443,10 @@ export const sidebar = {
     {
       text: "API reference",
       items: [
-        { text: "create-ponder", link: "/docs/0.12/api-reference/create-ponder" },
+        {
+          text: "create-ponder",
+          link: "/docs/0.12/api-reference/create-ponder",
+        },
         {
           text: "ponder",
           items: [
@@ -442,16 +476,24 @@ export const sidebar = {
             },
           ],
         },
-        { text: "@ponder/client", link: "/docs/0.12/api-reference/ponder-client" },
-        { text: "@ponder/react", link: "/docs/0.12/api-reference/ponder-react" },
-        { text: "@ponder/utils", link: "/docs/0.12/api-reference/ponder-utils" },
+        {
+          text: "@ponder/client",
+          link: "/docs/0.12/api-reference/ponder-client",
+        },
+        {
+          text: "@ponder/react",
+          link: "/docs/0.12/api-reference/ponder-react",
+        },
+        {
+          text: "@ponder/utils",
+          link: "/docs/0.12/api-reference/ponder-utils",
+        },
       ],
     },
     {
       text: "Advanced",
       items: [
         { text: "Observability", link: "/docs/0.12/advanced/observability" },
-        { text: "Telemetry", link: "/docs/0.12/advanced/telemetry" },
       ],
     },
   ],
@@ -578,7 +620,6 @@ export const sidebar = {
       text: "Advanced",
       items: [
         { text: "Observability", link: "/docs/0.11/advanced/observability" },
-        { text: "Telemetry", link: "/docs/0.11/advanced/telemetry" },
       ],
     },
   ],
@@ -704,12 +745,10 @@ export const sidebar = {
       text: "Advanced",
       items: [
         { text: "Observability", link: "/docs/0.10/advanced/observability" },
-        { text: "Telemetry", link: "/docs/0.10/advanced/telemetry" },
       ],
     },
   ],
 } satisfies Sidebar;
-
 
 export function getCanonicalSubpath(subpath: string): string | null {
   if (subpath.startsWith("/docs/0.15")) {
@@ -747,31 +786,41 @@ export function getBestSubpathForVersion(
 
   if (fromVersion === "latest") {
     if (toVersion === "0.15") {
-      for (const [v15Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_15)) {
+      for (const [v15Path, canonicalPath] of Object.entries(
+        canonicalSubpathsMap0_15,
+      )) {
         if (canonicalPath === subpath) {
           return v15Path;
         }
       }
     } else if (toVersion === "0.14") {
-      for (const [v14Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_14)) {
+      for (const [v14Path, canonicalPath] of Object.entries(
+        canonicalSubpathsMap0_14,
+      )) {
         if (canonicalPath === subpath) {
           return v14Path;
         }
       }
     } else if (toVersion === "0.12") {
-      for (const [v12Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_12)) {
+      for (const [v12Path, canonicalPath] of Object.entries(
+        canonicalSubpathsMap0_12,
+      )) {
         if (canonicalPath === subpath) {
           return v12Path;
         }
       }
     } else if (toVersion === "0.11") {
-      for (const [v11Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_11)) {
+      for (const [v11Path, canonicalPath] of Object.entries(
+        canonicalSubpathsMap0_11,
+      )) {
         if (canonicalPath === subpath) {
           return v11Path;
         }
       }
     } else if (toVersion === "0.10") {
-      for (const [v10Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_10)) {
+      for (const [v10Path, canonicalPath] of Object.entries(
+        canonicalSubpathsMap0_10,
+      )) {
         if (canonicalPath === subpath) {
           return v10Path;
         }
@@ -786,31 +835,41 @@ export function getBestSubpathForVersion(
   }
 
   if (toVersion === "0.15") {
-    for (const [v15Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_15)) {
+    for (const [v15Path, canonicalPath] of Object.entries(
+      canonicalSubpathsMap0_15,
+    )) {
       if (canonicalPath === canonical) {
         return v15Path;
       }
     }
   } else if (toVersion === "0.14") {
-    for (const [v14Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_14)) {
+    for (const [v14Path, canonicalPath] of Object.entries(
+      canonicalSubpathsMap0_14,
+    )) {
       if (canonicalPath === canonical) {
         return v14Path;
       }
     }
   } else if (toVersion === "0.12") {
-    for (const [v12Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_12)) {
+    for (const [v12Path, canonicalPath] of Object.entries(
+      canonicalSubpathsMap0_12,
+    )) {
       if (canonicalPath === canonical) {
         return v12Path;
       }
     }
   } else if (toVersion === "0.11") {
-    for (const [v11Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_11)) {
+    for (const [v11Path, canonicalPath] of Object.entries(
+      canonicalSubpathsMap0_11,
+    )) {
       if (canonicalPath === canonical) {
         return v11Path;
       }
     }
   } else if (toVersion === "0.10") {
-    for (const [v10Path, canonicalPath] of Object.entries(canonicalSubpathsMap0_10)) {
+    for (const [v10Path, canonicalPath] of Object.entries(
+      canonicalSubpathsMap0_10,
+    )) {
       if (canonicalPath === canonical) {
         return v10Path;
       }
@@ -864,7 +923,6 @@ const canonicalSubpathsMap0_15: { [key: string]: string | undefined } = {
   "/docs/0.15/api-reference/ponder-react": "/docs/api-reference/ponder-react",
   "/docs/0.15/api-reference/ponder-utils": "/docs/api-reference/ponder-utils",
   "/docs/0.15/advanced/observability": "/docs/advanced/observability",
-  "/docs/0.15/advanced/telemetry": "/docs/advanced/telemetry",
 };
 
 const subpaths0_15 = getNestedSubpaths(sidebar["/docs/0.15/"]);
@@ -877,7 +935,7 @@ for (const subpath of subpaths0_15) {
 
   if (!subpathsLatest.includes(canonicalSubpath)) {
     throw new Error(
-      `Invalid canonical path registered for 0.15 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`
+      `Invalid canonical path registered for 0.15 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`,
     );
   }
 }
@@ -923,7 +981,6 @@ const canonicalSubpathsMap0_14: { [key: string]: string | undefined } = {
   "/docs/0.14/api-reference/ponder-react": "/docs/api-reference/ponder-react",
   "/docs/0.14/api-reference/ponder-utils": "/docs/api-reference/ponder-utils",
   "/docs/0.14/advanced/observability": "/docs/advanced/observability",
-  "/docs/0.14/advanced/telemetry": "/docs/advanced/telemetry",
 };
 
 const subpaths0_14 = getNestedSubpaths(sidebar["/docs/0.14/"]);
@@ -936,7 +993,7 @@ for (const subpath of subpaths0_14) {
 
   if (!subpathsLatest.includes(canonicalSubpath)) {
     throw new Error(
-      `Invalid canonical path registered for 0.14 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`
+      `Invalid canonical path registered for 0.14 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`,
     );
   }
 }
@@ -981,7 +1038,6 @@ const canonicalSubpathsMap0_12: { [key: string]: string | undefined } = {
   "/docs/0.12/api-reference/ponder-react": "/docs/api-reference/ponder-react",
   "/docs/0.12/api-reference/ponder-utils": "/docs/api-reference/ponder-utils",
   "/docs/0.12/advanced/observability": "/docs/advanced/observability",
-  "/docs/0.12/advanced/telemetry": "/docs/advanced/telemetry",
 };
 
 const subpaths0_12 = getNestedSubpaths(sidebar["/docs/0.12/"]);
@@ -994,7 +1050,7 @@ for (const subpath of subpaths0_12) {
 
   if (!subpathsLatest.includes(canonicalSubpath)) {
     throw new Error(
-      `Invalid canonical path registered for 0.12 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`
+      `Invalid canonical path registered for 0.12 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`,
     );
   }
 }
@@ -1039,7 +1095,6 @@ const canonicalSubpathsMap0_11: { [key: string]: string | undefined } = {
   "/docs/0.11/api-reference/ponder-react": "/docs/api-reference/ponder-react",
   "/docs/0.11/api-reference/ponder-utils": "/docs/api-reference/ponder-utils",
   "/docs/0.11/advanced/observability": "/docs/advanced/observability",
-  "/docs/0.11/advanced/telemetry": "/docs/advanced/telemetry",
 };
 
 const subpaths0_11 = getNestedSubpaths(sidebar["/docs/0.11/"]);
@@ -1052,7 +1107,7 @@ for (const subpath of subpaths0_11) {
 
   if (!subpathsLatest.includes(canonicalSubpath)) {
     throw new Error(
-      `Invalid canonical path registered for 0.11 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`
+      `Invalid canonical path registered for 0.11 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`,
     );
   }
 }
@@ -1096,7 +1151,6 @@ const canonicalSubpathsMap0_10: { [key: string]: string | undefined } = {
   "/docs/0.10/api-reference/ponder-react": "/docs/api-reference/ponder-react",
   "/docs/0.10/api-reference/ponder-utils": "/docs/api-reference/ponder-utils",
   "/docs/0.10/advanced/observability": "/docs/advanced/observability",
-  "/docs/0.10/advanced/telemetry": "/docs/advanced/telemetry",
 };
 
 const subpaths0_10 = getNestedSubpaths(sidebar["/docs/0.10/"]);
@@ -1109,14 +1163,14 @@ for (const subpath of subpaths0_10) {
 
   if (!subpathsLatest.includes(canonicalSubpath)) {
     throw new Error(
-      `Invalid canonical path registered for 0.10 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`
+      `Invalid canonical path registered for 0.10 path (${subpath}). Suggested path (${canonicalSubpath}) does not exist.`,
     );
   }
 }
 
 function getNestedSubpaths(items: any[]): string[] {
   const links: string[] = [];
-  
+
   for (const item of items) {
     if (item.link) {
       links.push(item.link);
@@ -1125,6 +1179,6 @@ function getNestedSubpaths(items: any[]): string[] {
       links.push(...getNestedSubpaths(item.items));
     }
   }
-  
+
   return links;
 }

@@ -1,9 +1,20 @@
+import { sql } from "drizzle-orm";
+import {
+  getAbiItem,
+  hexToBigInt,
+  hexToNumber,
+  parseEther,
+  zeroAddress,
+} from "viem";
+import { beforeEach, expect, test, vi } from "vitest";
 import {
   ALICE,
   BOB,
   EMPTY_BLOCK_FILTER,
   EMPTY_LOG_FILTER,
+  EMPTY_TRACE_FILTER,
 } from "@/_test/constants.js";
+import { factoryABI } from "@/_test/generated.js";
 import {
   setupAnvil,
   setupCleanup,
@@ -25,11 +36,11 @@ import {
   getErc20IndexingBuild,
   getPairWithFactoryIndexingBuild,
 } from "@/_test/utils.js";
+import { buildLogFactory } from "@/build/factory.js";
+import { factory } from "@/config/address.js";
 import type { Factory, LogFilter } from "@/internal/types.js";
 import { orderObject } from "@/utils/order.js";
-import { sql } from "drizzle-orm";
-import { hexToBigInt, hexToNumber, parseEther, zeroAddress } from "viem";
-import { beforeEach, expect, test } from "vitest";
+import { getFilterBlockRange } from "./index.js";
 import * as ponderSyncSchema from "./schema.js";
 
 beforeEach(setupCommon);
@@ -209,7 +220,6 @@ test("getIntervals() adjacent intervals", async () => {
   await syncStore.insertIntervals({
     intervals: [
       {
-        // @ts-ignore
         filter: { ...filter, address: undefined },
         interval: [5, 8],
       },
@@ -262,7 +272,7 @@ test("getIntervals() adjacent intervals", async () => {
   `);
 });
 
-test("getIntervals() 0.15 migration", async () => {
+test("getIntervals() does not copy filter intervals to factory intervals for v0.15 migration", async () => {
   const { syncStore } = await setupDatabaseServices();
 
   const filter = {
@@ -283,6 +293,8 @@ test("getIntervals() 0.15 migration", async () => {
     toBlock: 20,
   } satisfies LogFilter;
 
+  // Simulate a v0.14 cache that only has log filter interval rows, with no
+  // corresponding factory_log interval rows.
   await syncStore.insertIntervals({
     intervals: [
       {
@@ -368,16 +380,48 @@ test("getIntervals() 0.15 migration", async () => {
             "toBlock": 20,
             "type": "factory_log",
           },
-          "intervals": [
-            [
-              10,
-              20,
-            ],
-          ],
+          "intervals": [],
         },
       ],
     }
   `);
+});
+
+test("getIntervals() returns factory intervals when factory_log rows exist", async () => {
+  const { syncStore } = await setupDatabaseServices();
+
+  const factory = {
+    id: "id",
+    type: "log",
+    chainId: 1,
+    sourceId: "factory",
+    address: "0xef2d6d194084c2de36e0dabfce45d046b37d1106",
+    eventSelector:
+      "0x02c69be41d0b7e40352fc85be1cd65eb03d40ef8427a0ca4596b1ead9a00e9fc",
+    childAddressLocation: "topic1",
+    fromBlock: 10,
+    toBlock: 20,
+  } as Factory;
+
+  const filter = {
+    ...EMPTY_LOG_FILTER,
+    address: factory,
+    fromBlock: 10,
+    toBlock: 20,
+  } satisfies LogFilter;
+
+  await syncStore.insertIntervals({
+    intervals: [{ filter, interval: [10, 20] }],
+    factoryIntervals: [{ factory, interval: [10, 20] }],
+    chainId: 1,
+  });
+
+  const intervals = await syncStore.getIntervals({
+    filters: [filter],
+  });
+
+  expect(intervals.get(filter)![0]!.intervals).toEqual([[10, 20]]);
+  expect(intervals.get(factory)![0]!.intervals).toEqual([[10, 20]]);
 });
 
 test("insertIntervals() merges duplicates", async () => {
@@ -956,6 +1000,80 @@ test("getEventBlockData() returns events", async () => {
   expect(blocks).toHaveLength(1);
 });
 
+test("getFilterBlockRange() merges filter and pagination bounds", () => {
+  expect(
+    getFilterBlockRange({
+      filters: [
+        { fromBlock: 10, toBlock: 80 },
+        { fromBlock: 20, toBlock: 90 },
+      ],
+      fromBlock: 0,
+      toBlock: 100,
+    }),
+  ).toEqual({ fromBlock: 10, toBlock: 90 });
+
+  expect(
+    getFilterBlockRange({
+      filters: [
+        { fromBlock: 10, toBlock: 80 },
+        { fromBlock: undefined, toBlock: undefined },
+      ],
+      fromBlock: 20,
+      toBlock: 70,
+    }),
+  ).toEqual({ fromBlock: 20, toBlock: 70 });
+
+  expect(
+    getFilterBlockRange({
+      filters: [{ fromBlock: 0, toBlock: 30 }],
+      fromBlock: 20,
+      toBlock: 90,
+    }),
+  ).toEqual({ fromBlock: 20, toBlock: 30 });
+
+  expect(
+    getFilterBlockRange({ filters: [], fromBlock: 20, toBlock: 90 }),
+  ).toEqual({ fromBlock: 20, toBlock: 90 });
+});
+
+test("getEventData() applies one block range to logs and traces queries", async () => {
+  const { database, syncStore } = await setupDatabaseServices();
+  const querySpy = vi.spyOn(database.syncQB.$client, "query");
+
+  await syncStore.getEventData({
+    filters: [
+      { ...EMPTY_LOG_FILTER, fromBlock: 10, toBlock: 80 },
+      { ...EMPTY_LOG_FILTER, fromBlock: 20, toBlock: 90 },
+      { ...EMPTY_TRACE_FILTER, fromBlock: 30, toBlock: 70 },
+    ],
+    fromBlock: 0,
+    toBlock: 100,
+    chainId: 1,
+    limit: 10,
+  });
+
+  const queries = querySpy.mock.calls.map(([query, params]) =>
+    typeof query === "string"
+      ? { text: query, values: params }
+      : (query as { text: string; values: unknown[] }),
+  );
+  const logsQuery = queries.find(({ text }) =>
+    text.includes('from "ponder_sync"."logs"'),
+  );
+  const tracesQuery = queries.find(({ text }) =>
+    text.includes('from "ponder_sync"."traces"'),
+  );
+
+  expect(logsQuery).toBeDefined();
+  expect(logsQuery!.text.match(/"block_number" >=/g)).toHaveLength(1);
+  expect(logsQuery!.text.match(/"block_number" <=/g)).toHaveLength(1);
+  expect(logsQuery!.values).toEqual(expect.arrayContaining([10n, 90n]));
+  expect(tracesQuery).toBeDefined();
+  expect(tracesQuery!.text.match(/"block_number" >=/g)).toHaveLength(1);
+  expect(tracesQuery!.text.match(/"block_number" <=/g)).toHaveLength(1);
+  expect(tracesQuery!.values).toEqual(expect.arrayContaining([30n, 70n]));
+});
+
 test("getEventBlockData() pagination", async () => {
   const { syncStore } = await setupDatabaseServices();
 
@@ -996,7 +1114,7 @@ test("insertRpcRequestResults() ", async () => {
   await syncStore.insertRpcRequestResults({
     requests: [
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x1"] },
         blockNumber: 1,
         result: "0x1",
@@ -1020,7 +1138,7 @@ test("insertRpcRequestResults() hash matches postgres", async () => {
   await syncStore.insertRpcRequestResults({
     requests: [
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x1"] },
         blockNumber: 1,
         result: "0x1",
@@ -1050,7 +1168,7 @@ test("getRpcRequestResults()", async () => {
   await syncStore.insertRpcRequestResults({
     requests: [
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x1"] },
         blockNumber: 1,
         result: "0x1",
@@ -1060,9 +1178,9 @@ test("getRpcRequestResults()", async () => {
   });
   const result = await syncStore.getRpcRequestResults({
     requests: [
-      // @ts-ignore
+      // @ts-expect-error
       { method: "eth_call", params: ["0x1"] },
-      // @ts-ignore
+      // @ts-expect-error
       { method: "eth_call", params: ["0x2"] },
     ],
     chainId: 1,
@@ -1129,25 +1247,25 @@ test("pruneRpcRequestResult", async () => {
   await syncStore.insertRpcRequestResults({
     requests: [
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x1"] },
         blockNumber: 1,
         result: "0x1",
       },
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x2"] },
         blockNumber: 2,
         result: "0x2",
       },
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x3"] },
         blockNumber: 3,
         result: "0x3",
       },
       {
-        // @ts-ignore
+        // @ts-expect-error
         request: { method: "eth_call", params: ["0x4"] },
         blockNumber: 4,
         result: "0x4",
@@ -1245,4 +1363,78 @@ test("pruneByChain deletes blocks, logs, traces, transactions", async () => {
   expect(traces).toHaveLength(0);
   expect(transactions).toHaveLength(0);
   expect(transactionReceipts).toHaveLength(0);
+});
+
+test("getIntervals() does not infer factory intervals from log filter intervals when factory identity changes", async () => {
+  const { syncStore } = await setupDatabaseServices();
+
+  const { address } = await deployFactory({ sender: ALICE });
+
+  const factoryV1 = buildLogFactory({
+    chainId: 1,
+    sourceId: "Pair",
+    fromBlock: undefined,
+    toBlock: undefined,
+    ...factory({
+      address,
+      event: getAbiItem({ abi: factoryABI, name: "PairCreated" }),
+      parameter: "pair",
+    }),
+  });
+
+  const filterV1: LogFilter = {
+    ...EMPTY_LOG_FILTER,
+    sourceId: "Pair",
+    address: factoryV1,
+  };
+
+  // Simulate a previously synced cache where only the log filter interval
+  // row exists (the factory interval row is absent).
+  await syncStore.insertIntervals({
+    intervals: [{ filter: filterV1, interval: [0, 20] }],
+    factoryIntervals: [],
+    chainId: 1,
+  });
+
+  // Change the factory identity by introducing a fromBlock. This produces a
+  // new factory_log_* fragment ID, while the log_* fragment ID remains the
+  // same because it does not encode fromBlock for factory addresses.
+  const factoryV2 = buildLogFactory({
+    chainId: 1,
+    sourceId: "Pair",
+    fromBlock: 10,
+    toBlock: undefined,
+    ...factory({
+      address,
+      event: getAbiItem({ abi: factoryABI, name: "PairCreated" }),
+      parameter: "pair",
+    }),
+  });
+
+  const filterV2: LogFilter = {
+    ...EMPTY_LOG_FILTER,
+    sourceId: "Pair",
+    address: factoryV2,
+    fromBlock: 10,
+  };
+
+  const intervals = await syncStore.getIntervals({
+    filters: [filterV2],
+  });
+
+  const filterIntervals = intervals
+    .get(filterV2)!
+    .flatMap(({ intervals }) => intervals);
+  const factoryIntervals = intervals
+    .get(factoryV2)!
+    .flatMap(({ intervals }) => intervals);
+
+  // The log filter should still see the previously synced range.
+  expect(filterIntervals).toEqual([[0, 20]]);
+
+  // The factory must NOT inherit the log filter's intervals, because the
+  // factory identity changed and no child addresses have been discovered for
+  // the new factory range. Reporting a complete interval here would cause the
+  // sync engine to skip child discovery and silently miss child events.
+  expect(factoryIntervals).toEqual([]);
 });

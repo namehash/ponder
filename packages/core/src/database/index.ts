@@ -1,3 +1,19 @@
+import type { PGlite } from "@electric-sql/pglite";
+import {
+  eq,
+  getTableName,
+  getViewName,
+  isTable,
+  isView,
+  sql,
+} from "drizzle-orm";
+import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
+import { pgSchema, pgTable } from "drizzle-orm/pg-core";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { Kysely, Migrator, PostgresDialect, WithSchemaPlugin } from "kysely";
+import type { Pool } from "pg";
+import prometheus from "prom-client";
+import { hexToBigInt, hexToNumber } from "viem";
 import {
   getLiveQueryNotifyProcedureName,
   getLiveQueryProcedureName,
@@ -18,6 +34,22 @@ import type {
   PreBuild,
   SchemaBuild,
 } from "@/internal/types.js";
+import { buildMigrationProvider } from "@/sync-store/migrations.js";
+import * as PONDER_SYNC from "@/sync-store/schema.js";
+import { decodeCheckpoint } from "@/utils/checkpoint.js";
+import { formatEta } from "@/utils/format.js";
+import { createPool, createReadonlyPool } from "@/utils/pg.js";
+import { createPglite, createPgliteKyselyDialect } from "@/utils/pglite.js";
+import { startClock } from "@/utils/timer.js";
+import { wait } from "@/utils/wait.js";
+import {
+  crashRecovery,
+  createLiveQueryProcedures,
+  dropLiveQueryTriggers,
+  dropTriggers,
+} from "./actions.js";
+import { createQB, parseDbError, type QB } from "./queryBuilder.js";
+
 export type MigrateResult = {
   crashRecoveryCheckpoint: CrashRecoveryCheckpoint;
   /**
@@ -27,37 +59,6 @@ export type MigrateResult = {
    */
   createIndexes: boolean;
 };
-import { buildMigrationProvider } from "@/sync-store/migrations.js";
-import * as PONDER_SYNC from "@/sync-store/schema.js";
-import { decodeCheckpoint } from "@/utils/checkpoint.js";
-import { formatEta } from "@/utils/format.js";
-import { createPool, createReadonlyPool } from "@/utils/pg.js";
-import { createPglite, createPgliteKyselyDialect } from "@/utils/pglite.js";
-import { startClock } from "@/utils/timer.js";
-import { wait } from "@/utils/wait.js";
-import type { PGlite } from "@electric-sql/pglite";
-import {
-  eq,
-  getTableName,
-  getViewName,
-  isTable,
-  isView,
-  sql,
-} from "drizzle-orm";
-import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
-import { pgSchema, pgTable } from "drizzle-orm/pg-core";
-import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
-import { Kysely, Migrator, PostgresDialect, WithSchemaPlugin } from "kysely";
-import type { Pool } from "pg";
-import prometheus from "prom-client";
-import { hexToBigInt, hexToNumber } from "viem";
-import {
-  crashRecovery,
-  createLiveQueryProcedures,
-  dropLiveQueryTriggers,
-  dropTriggers,
-} from "./actions.js";
-import { type QB, createQB, parseDbError } from "./queryBuilder.js";
 
 export type Database = {
   driver: PostgresDriver | PGliteDriver;

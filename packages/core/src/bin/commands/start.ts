@@ -1,12 +1,11 @@
 import { runCodegen } from "@/bin/utils/codegen.js";
 import { createBuild } from "@/build/index.js";
-import { type Database, createDatabase } from "@/database/index.js";
+import { createDatabase, type Database } from "@/database/index.js";
 import type { Common } from "@/internal/common.js";
 import { createLogger } from "@/internal/logger.js";
 import { MetricsService } from "@/internal/metrics.js";
 import { buildOptions } from "@/internal/options.js";
 import { createShutdown } from "@/internal/shutdown.js";
-import { buildPayload, createTelemetry } from "@/internal/telemetry.js";
 import type {
   ApiBuild,
   CrashRecoveryCheckpoint,
@@ -47,26 +46,22 @@ export async function start({
     mode: options.logFormat,
   });
 
-  const [major, minor, _patch] = process.versions.node
-    .split(".")
-    .map(Number) as [number, number, number];
-  if (major < 18 || (major === 18 && minor < 14)) {
+  const major = Number(process.versions.node.split(".")[0]);
+  if (major < 22) {
     logger.error({
       msg: "Invalid Node.js version",
       version: process.versions.node,
-      expected: "18.14",
+      expected: "22",
     });
     process.exit(1);
   }
 
   const metrics = new MetricsService();
   const shutdown = createShutdown();
-  const telemetry = createTelemetry({ options, logger, shutdown });
   const common = {
     options,
     logger,
     metrics,
-    telemetry,
     shutdown,
     buildShutdown: shutdown,
     apiShutdown: shutdown,
@@ -89,7 +84,7 @@ export async function start({
 
   const build = await createBuild({ common, cliOptions });
 
-  // biome-ignore lint/style/useConst: <explanation>
+  // biome-ignore lint/style/useConst: `database` is assigned in later startup branches.
   let database: Database | undefined;
 
   const namespaceResult = build.namespaceCompile();
@@ -261,18 +256,6 @@ export async function start({
     await exit({ code: 1 });
     return;
   }
-
-  telemetry.record({
-    name: "lifecycle:session_start",
-    properties: {
-      cli_command: "start",
-      ...buildPayload({
-        preBuild: preCompileResult.result,
-        schemaBuild: compileSchemaResult.result,
-        indexingBuild: indexingBuildResult.result,
-      }),
-    },
-  });
 
   metrics.ponder_settings_info.set(
     {

@@ -1,6 +1,62 @@
 # @ensnode/ponder
 
+## 0.17.1
+
+### Patch Changes
+
+- [#2338](https://github.com/ponder-sh/ponder/pull/2338) [`1aedab8`](https://github.com/ponder-sh/ponder/commit/1aedab815eb4e304b9c0a928e014307c5d71e333) Thanks [@kyscott18](https://github.com/kyscott18)! - Improved sync performance by removing redundant block range constraints from event queries.
+
+## 0.17.0
+
+### Minor Changes
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Updated the minimum supported `viem` version to `2.35.0` for ENSv2 Universal Resolver support.
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Added support for co-located test files in the indexing directory. Files matching `*.test.{ts,js,mts,mjs}` and `*.spec.{ts,js,mts,mjs}` are now ignored when loading indexing functions.
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Fixed a bug that caused apps with factories to miss historical events after updating factory config. Affected apps that updated from `v0.14` will refetch block data automatically.
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Updated the minimum supported TypeScript version to `5.4.0`. Newly created Ponder projects now use TypeScript `5.4.0`.
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Updated the minimum required Node.js version from `18.14` to `22`. Running `ponder dev`, `ponder start`, `ponder serve`, `ponder codegen`, or `create-ponder` on older Node.js versions now exits with the error `Invalid Node.js version`.
+
+### Patch Changes
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Fixed a bug that mutated the PGlite `dataDir` option when using the in-memory database.
+
+- [#2332](https://github.com/ponder-sh/ponder/pull/2332) [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30) Thanks [@kyscott18](https://github.com/kyscott18)! - Removed anonymous telemetry collection from Ponder.
+
+- Updated dependencies [[`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30), [`5075dc1`](https://github.com/ponder-sh/ponder/commit/5075dc1251f1253457c60ad8c9a722229a19cd30)]:
+  - @ponder/utils@0.3.0
+
+## 0.16.10
+
+### Patch Changes
+
+- [#2325](https://github.com/ponder-sh/ponder/pull/2325) [`18b2bb2`](https://github.com/ponder-sh/ponder/commit/18b2bb2371c2236a724cef1eecd6e6469635b3ac) Thanks [@kyscott18](https://github.com/kyscott18)! - Fixed a bug that could cause incorrect indexed data when a database error occurs during live indexing.
+
+## 0.16.9
+
+### Patch Changes
+
+- [#2323](https://github.com/ponder-sh/ponder/pull/2323) [`dee28aa`](https://github.com/ponder-sh/ponder/commit/dee28aa570cc457737a29508c9e7ded4d2431f5e) Thanks [@kyscott18](https://github.com/kyscott18)! - Fixed a bug with `p.bytes()` bytea encoding when flushing rows to Postgres with COPY that caused `DelayedInsertError: invalid byte sequence for encoding "UTF8": 0x00`.
+
+## 0.16.8
+
+### Patch Changes
+
+- [#2317](https://github.com/ponder-sh/ponder/pull/2317) [`00b5073`](https://github.com/ponder-sh/ponder/commit/00b5073531ed439c505a907e88277fa0c7848b26) Thanks [@kyscott18](https://github.com/kyscott18)! - Fix realtime log syncing on async-execution chains with stale logs blooms.
+
 ## 0.16.7
+
+### Patch Changes
+
+- [#2314](https://github.com/ponder-sh/ponder/pull/2314) [`6ad8b87`](https://github.com/ponder-sh/ponder/commit/6ad8b8709872fc7482e8710b9302c8e0061f588d) Thanks [@kyscott18](https://github.com/kyscott18)! - Updated live query notification to support more than 100 tables. Table count limit (100) is no longer enforced.
+
+## 0.16.7 (`@ensnode/ponder` fork release)
+
+> Note: this entry is the fork's own `@ensnode/ponder@0.16.7`, branched from upstream
+> `ponder@0.16.6`. It is unrelated to the upstream `ponder@0.16.7` entry above.
 
 ### Patch Changes
 

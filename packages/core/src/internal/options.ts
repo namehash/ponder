@@ -1,8 +1,8 @@
 import path from "node:path";
 import v8 from "node:v8";
-import type { CliOptions } from "@/bin/ponder.js";
 import type { LevelWithSilent } from "pino";
-import { type SemVer, parse } from "semver";
+import { parse, type SemVer } from "semver";
+import type { CliOptions } from "@/bin/ponder.js";
 
 export type Options = {
   command: "dev" | "start" | "serve" | "codegen" | "list" | "prune";
@@ -19,10 +19,6 @@ export type Options = {
 
   port: number;
   hostname?: string;
-
-  telemetryUrl: string;
-  telemetryDisabled: boolean;
-  telemetryConfigDir: string | undefined;
 
   logLevel: LevelWithSilent;
   logFormat: "json" | "pretty";
@@ -100,10 +96,6 @@ export const buildOptions = ({ cliOptions }: { cliOptions: CliOptions }) => {
 
     port,
     hostname,
-
-    telemetryUrl: "https://ponder.sh/api/telemetry",
-    telemetryDisabled: Boolean(process.env.PONDER_TELEMETRY_DISABLED),
-    telemetryConfigDir: undefined,
 
     logLevel,
     logFormat: cliOptions.logFormat! as Options["logFormat"],

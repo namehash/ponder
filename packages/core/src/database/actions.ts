@@ -1,8 +1,22 @@
+import {
+  and,
+  eq,
+  getTableColumns,
+  getTableName,
+  getViewName,
+  lte,
+  type SQL,
+  sql,
+  type Table,
+  type View,
+} from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { getPrimaryKeyColumns } from "@/drizzle/index.js";
 import { getColumnCasing, getReorgTable } from "@/drizzle/kit/index.js";
 import {
   getLiveQueryChannelName,
   getLiveQueryNotifyProcedureName,
+  getLiveQueryNotifyProcedureSql,
   getLiveQueryNotifyTriggerName,
   getLiveQueryProcedureName,
   getLiveQueryTempTableName,
@@ -19,24 +33,11 @@ import type {
   PreBuild,
   SchemaBuild,
 } from "@/internal/types.js";
-import { MAX_CHECKPOINT_STRING, decodeCheckpoint } from "@/utils/checkpoint.js";
+import { decodeCheckpoint, MAX_CHECKPOINT_STRING } from "@/utils/checkpoint.js";
 import {
-  type SQL,
-  type Table,
-  type View,
-  and,
-  eq,
-  getTableColumns,
-  getTableName,
-  getViewName,
-  lte,
-  sql,
-} from "drizzle-orm";
-import { getTableConfig } from "drizzle-orm/pg-core";
-import {
+  getPonderCheckpointTable,
   PONDER_CHECKPOINT_TABLE_NAME,
   PONDER_META_TABLE_NAME,
-  getPonderCheckpointTable,
 } from "./index.js";
 import type { QB } from "./queryBuilder.js";
 
@@ -246,37 +247,10 @@ $$;`,
         context,
       );
 
-      const notifyProcedure = getLiveQueryNotifyProcedureName();
       const channel = getLiveQueryChannelName(namespaceBuild.schema);
 
       await tx.wrap(
-        (tx) =>
-          tx.execute(`
-CREATE OR REPLACE FUNCTION "${schema}".${notifyProcedure}
-RETURNS TRIGGER LANGUAGE plpgsql
-AS $$
-  DECLARE
-    table_names json;
-    table_exists boolean := false;
-  BEGIN
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_name = '${getLiveQueryTempTableName()}'
-      AND table_type = 'LOCAL TEMPORARY'
-    ) INTO table_exists;
-
-    IF table_exists THEN
-      SELECT json_agg(table_name) INTO table_names
-      FROM ${getLiveQueryTempTableName()};
-
-      table_names := COALESCE(table_names, '[]'::json);
-      PERFORM pg_notify('${channel}', table_names::text);
-    END IF;
-
-    RETURN NULL;
-  END;
-$$;`),
+        (tx) => tx.execute(getLiveQueryNotifyProcedureSql({ schema, channel })),
         context,
       );
     },
@@ -358,41 +332,21 @@ export const createViews = async (
         ),
       );
 
-      const notifyProcedure = getLiveQueryNotifyProcedureName();
       const channel = getLiveQueryChannelName(namespaceBuild.viewsSchema!);
 
       await tx.wrap((tx) =>
-        tx.execute(`
-CREATE OR REPLACE FUNCTION "${namespaceBuild.viewsSchema}".${notifyProcedure}
-RETURNS TRIGGER LANGUAGE plpgsql
-AS $$
-  DECLARE
-    table_names json;
-    table_exists boolean := false;
-  BEGIN
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_name = '${getLiveQueryTempTableName()}'
-      AND table_type = 'LOCAL TEMPORARY'
-    ) INTO table_exists;
-
-    IF table_exists THEN
-      SELECT json_agg(table_name) INTO table_names
-      FROM ${getLiveQueryTempTableName()};
-
-      table_names := COALESCE(table_names, '[]'::json);
-      PERFORM pg_notify('${channel}', table_names::text);
-    END IF;
-
-    RETURN NULL;
-  END;
-$$;`),
+        tx.execute(
+          getLiveQueryNotifyProcedureSql({
+            schema: namespaceBuild.viewsSchema!,
+            channel,
+          }),
+        ),
       );
 
       const trigger = getViewsLiveQueryNotifyTriggerName(
         namespaceBuild.viewsSchema!,
       );
+      const notifyProcedure = getLiveQueryNotifyProcedureName();
 
       await tx.wrap((tx) =>
         tx.execute(
@@ -450,7 +404,7 @@ WITH reverted1 AS (
 ), ${getRevertSql({ table })};`),
         );
 
-        // @ts-ignore
+        // @ts-expect-error
         counts.push(result.rows[0]!.count);
       }
 
@@ -493,7 +447,6 @@ AND checkpoint > '${checkpoint}'`,
   .join(" UNION ALL ")}) AS all_mins;`),
         )
         .then((result) => {
-          // @ts-ignore
           return result.rows[0]?.operation_id as string | null;
         });
 
@@ -520,7 +473,7 @@ WITH reverted1 AS (
 ), ${getRevertSql({ table })};`),
         );
 
-        // @ts-ignore
+        // @ts-expect-error
         counts.push(result.rows[0]!.count);
       }
 
@@ -571,7 +524,7 @@ WITH reverted1 AS (
 ), ${getRevertSql({ table })};`),
         );
 
-        // @ts-ignore
+        // @ts-expect-error
         counts.push(result.rows[0]!.count);
       }
 
@@ -693,7 +646,6 @@ WHERE checkpoint > (
   .join(" UNION ALL ")}) AS all_mins;`),
         )
         .then((result) => {
-          // @ts-ignore
           return result.rows[0]?.operation_id as string | null;
         });
 
