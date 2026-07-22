@@ -635,7 +635,14 @@ export const createRpc = ({
           }
 
           if (shouldRetry(error) === false) {
-            logger.warn({
+            // An `execution reverted` result is a deterministic on-chain outcome, not
+            // an RPC/infra failure. In an indexer that probes contracts (e.g. eip-165
+            // `supportsInterface`) reverts are expected and handled by caller code, so
+            // log them at debug instead of spamming warn.
+            const isExpectedRevert =
+              typeof error?.message === "string" &&
+              error.message.includes("revert");
+            logger[isExpectedRevert ? "debug" : "warn"]({
               msg: "Received JSON-RPC error",
               chain: chain.name,
               chain_id: chain.id,
@@ -934,9 +941,39 @@ export const createRpc = ({
 };
 
 /**
+ * Whether an error is a deterministic eth_call execution outcome rather than a
+ * transient infrastructure failure.
+ *
+ * Standard providers report these as "execution reverted". Some (e.g. Alchemy on
+ * pre-2018 contracts) surface eip-165 `supportsInterface` probes against
+ * non-supporting contracts as a raw EVM execution fault (`InvalidJump`,
+ * `InvalidFEOpcode`, "invalid opcode") wrapped in a `TransactionRejectedRpcError`,
+ * so the cause chain is walked to find it.
+ */
+export const isDeterministicExecutionError = (error: unknown): boolean => {
+  for (let e = error as any; e != null; e = e.cause) {
+    const message = typeof e.message === "string" ? e.message : "";
+    const details = typeof e.details === "string" ? e.details : "";
+    const s = `${message} ${details}`;
+    // "EVM error" is the provider prefix for any deterministic EVM execution fault
+    // (InvalidJump, InvalidFEOpcode, NotActivated, StackUnderflow, ...).
+    if (
+      s.includes("revert") ||
+      s.includes("EVM error") ||
+      s.includes("invalid opcode")
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
  * @link https://github.com/wevm/viem/blob/main/src/utils/buildtask.ts#L192
  */
 function shouldRetry(error: Error) {
+  // Never retry a deterministic on-chain execution outcome.
+  if (isDeterministicExecutionError(error)) return false;
   if ("code" in error && typeof error.code === "number") {
     // Invalid JSON
     if (error.code === ParseRpcError.code) return false;

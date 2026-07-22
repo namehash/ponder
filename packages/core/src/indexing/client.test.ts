@@ -32,7 +32,7 @@ import {
   publicClient,
 } from "@/_test/utils.js";
 import { createRpc } from "@/rpc/index.js";
-import { createCachedViemClient } from "./client.js";
+import { createCachedViemClient, decodeResponse } from "./client.js";
 import { getEventCount } from "./index.js";
 
 beforeEach(setupCommon);
@@ -516,6 +516,86 @@ test("request() revert", async () => {
   expect(response1).toBeInstanceOf(Error);
 });
 
+test("request() caches a deterministic revert", async () => {
+  const chain = getChain();
+  const rpc = createRpc({
+    chain,
+    common: context.common,
+  });
+
+  const { address } = await deployRevert({ sender: ALICE });
+  const { address: erc20 } = await deployErc20({ sender: ALICE });
+  const blockData = await mintErc20({
+    erc20,
+    to: ALICE,
+    amount: parseEther("1"),
+    sender: ALICE,
+  });
+
+  const { syncStore } = await setupDatabaseServices();
+
+  const { eventCallbacks, indexingFunctions } = getErc20IndexingBuild({
+    address: erc20,
+  });
+  const event = getSimulatedEvent({
+    eventCallback: eventCallbacks[0],
+    blockData,
+  });
+
+  const cachedViemClient = createCachedViemClient({
+    common: context.common,
+    indexingBuild: { chains: [chain], rpcs: [rpc] },
+    syncStore,
+    eventCount: getEventCount(indexingFunctions),
+  });
+  cachedViemClient.event = event;
+
+  const body = {
+    method: "eth_call",
+    params: [
+      {
+        to: address,
+        data: encodeFunctionData({
+          abi: revertABI,
+          functionName: "revert",
+          args: [true],
+        }),
+      },
+      // a fixed historical block, so the revert is deterministic
+      "0x1",
+    ],
+  } as const;
+
+  const insertSpy = vi.spyOn(syncStore, "insertRpcRequestResults");
+
+  const response1 = await cachedViemClient
+    .getClient(chain)
+    .request(body)
+    .catch((error) => error);
+
+  expect(response1).toBeInstanceOf(Error);
+
+  // the revert is persisted as a sentinel rather than re-issued on every run
+  expect(insertSpy).toHaveBeenCalledTimes(1);
+  expect(insertSpy.mock.calls[0]![0].requests[0]!.result).toContain(
+    "__ponderReverted",
+  );
+
+  // flush the fire-and-forget write before asserting the cache is used
+  await insertSpy.mock.results[0]!.value;
+
+  const requestSpy = vi.spyOn(rpc, "request");
+
+  const response2 = await cachedViemClient
+    .getClient(chain)
+    .request(body)
+    .catch((error) => error);
+
+  // the cached revert is re-thrown, with no RPC request
+  expect(response2).toBeInstanceOf(Error);
+  expect(requestSpy).toHaveBeenCalledTimes(0);
+});
+
 test("readContract() action retry", async () => {
   const chain = getChain();
   const rpc = createRpc({
@@ -704,4 +784,18 @@ test("getBlock() action retry", async () => {
   await cachedViemClient.getClient(chain).getBlock({ blockNumber: 1n });
 
   expect(requestSpy).toHaveBeenCalledTimes(2);
+});
+
+test("decodeResponse() re-throws a cached deterministic revert", () => {
+  // ordinary responses are parsed as-is
+  expect(decodeResponse(JSON.stringify("0x1"))).toBe("0x1");
+
+  // a non-JSON response is returned verbatim
+  expect(decodeResponse("not json")).toBe("not json");
+
+  // the sentinel written for a cached revert surfaces as the original failure,
+  // so callers observe what a live RPC would have thrown
+  expect(() =>
+    decodeResponse(JSON.stringify({ __ponderReverted: "execution reverted" })),
+  ).toThrow("execution reverted");
 });

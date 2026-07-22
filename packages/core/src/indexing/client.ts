@@ -48,7 +48,11 @@ import type {
   IndexingBuild,
   SetupEvent,
 } from "@/internal/types.js";
-import type { RequestParameters, Rpc } from "@/rpc/index.js";
+import {
+  isDeterministicExecutionError,
+  type RequestParameters,
+  type Rpc,
+} from "@/rpc/index.js";
 import type { SyncStore } from "@/sync-store/index.js";
 import { dedupe } from "@/utils/dedupe.js";
 import { toLowerCase } from "@/utils/lowercase.js";
@@ -85,6 +89,15 @@ const MAX_CONSTANT_PATTERN_COUNT = 10;
  * `null` is returned by `eth_getBlockByNumber` and `eth_getBlockByHash` and causes the `BlockNotFoundError`.
  */
 const UNCACHED_RESPONSES = ["0x", null] as any[];
+
+/**
+ * Key of the sentinel object cached (as JSON) for deterministic `eth_call` reverts, so
+ * repeat runs are served from the cache instead of re-issuing the RPC request.
+ *
+ * @see decodeResponse
+ * @see cachedTransport
+ */
+const REVERTED_SENTINEL_KEY = "__ponderReverted";
 
 /** RPC methods that reference a block number. */
 const blockDependentMethods = new Set([
@@ -413,11 +426,22 @@ export const encodeRequest = (request: Request) =>
 
 export const decodeResponse = (response: Response) => {
   // Note: I don't actually remember why we had to add the try catch.
+  let parsed: any;
   try {
-    return JSON.parse(response);
+    parsed = JSON.parse(response);
   } catch (_error) {
     return response;
   }
+  // A cached deterministic revert is re-thrown so callers observe the same failure they
+  // would from a live RPC (protocol-acceleration swallows it), with no RPC request.
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    REVERTED_SENTINEL_KEY in parsed
+  ) {
+    throw new Error(String(parsed[REVERTED_SENTINEL_KEY]));
+  }
+  return parsed;
 };
 
 export const createCachedViemClient = ({
@@ -589,7 +613,15 @@ export const createCachedViemClient = ({
               const chain = indexingBuild.chains.find(
                 (n) => n.id === event.chain.id,
               )!;
-              common.logger.warn({
+              // A contract revert OR a zero-data ("0x") response is a deterministic
+              // on-chain outcome that caller code is expected to handle (e.g. eip-165
+              // `supportsInterface` probes, which revert or return no data when
+              // unsupported). Log at debug instead of warn so these don't spam.
+              const isExpectedContractError =
+                typeof (error as Error)?.message === "string" &&
+                ((error as Error).message.includes("revert") ||
+                  (error as Error).message.includes("returned no data"));
+              common.logger[isExpectedContractError ? "debug" : "warn"]({
                 msg: "Failed 'context.client' action",
                 action: actionName,
                 event: eventName,
@@ -1126,7 +1158,40 @@ export const cachedTransport =
             type: "rpc",
           });
 
-          const response = await rpc.request(body, context);
+          const response = await rpc
+            .request(body, context)
+            .catch((error: unknown) => {
+              // Cache a deterministic `eth_call` revert at a fixed historical block so
+              // subsequent runs are served from the cache instead of re-issuing the RPC
+              // request (e.g. eip-165 `supportsInterface` probes on non-supporting
+              // contracts).
+              if (
+                method === "eth_call" &&
+                encodedBlockNumber !== undefined &&
+                encodedBlockNumber !== 0 &&
+                isDeterministicExecutionError(error)
+              ) {
+                syncStore
+                  .insertRpcRequestResults(
+                    {
+                      requests: [
+                        {
+                          request: body,
+                          blockNumber: encodedBlockNumber,
+                          result: JSON.stringify({
+                            [REVERTED_SENTINEL_KEY]:
+                              (error as Error)?.message ?? "reverted",
+                          }),
+                        },
+                      ],
+                      chainId: chain.id,
+                    },
+                    context,
+                  )
+                  .catch(() => {});
+              }
+              throw error;
+            });
 
           if (UNCACHED_RESPONSES.includes(response) === false) {
             // Note: insertRpcRequestResults errors can be ignored and not awaited, since
