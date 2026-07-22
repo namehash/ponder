@@ -1,5 +1,30 @@
 # @ensnode/ponder
 
+## 0.17.1-ensnode.1
+
+### Patch Changes
+
+- Cache deterministic `eth_call` reverts. A revert at a fixed historical block is
+  stored as a sentinel and re-thrown on replay, so repeat runs are served from the
+  cache instead of re-issuing the request. This mainly benefits indexers that probe
+  contracts — e.g. eip-165 `supportsInterface` against non-supporting contracts.
+
+- Stop retrying deterministic on-chain execution outcomes. `shouldRetry` now returns
+  `false` for them, and they log at debug rather than warn, so contract probes no
+  longer spam the logs or burn retries. Classification walks the error cause chain,
+  since some providers report these as a raw EVM fault (`InvalidJump`,
+  `InvalidFEOpcode`, `invalid opcode`) wrapped in a `TransactionRejectedRpcError`
+  rather than as `execution reverted`.
+
+  Zero-data (`"0x"`) responses are deliberately excluded from this classification.
+  They remain retryable, matching the existing behaviour.
+
+- Keep cached and uncached multicall runs consistent. Multicall sub-calls are
+  decomposed into `eth_call` bodies identical to the equivalent standalone call, so
+  they share cache keys. A cached revert read back inside a multicall now reports
+  that sub-call as `success: false`, the way a live `aggregate3` with `allowFailure`
+  does, instead of throwing and aborting the whole batch.
+
 ## 0.17.1-ensnode.0
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@ensnode/ponder",
-  "version": "0.17.1-ensnode.0",
+  "version": "0.17.1-ensnode.1",
   "description": "An open-source TypeScript framework for EVM data indexing (namehash fork of ponder)",
   "license": "MIT",
   "type": "module",
