@@ -1,5 +1,25 @@
 # @ensnode/ponder
 
+## 0.17.1-ensnode.2
+
+### Patch Changes
+
+- Cache empty (`"0x"`) `eth_call` responses at a fixed historical block, but only once
+  the calling `context.client` action has exhausted its retries. Upstream never caches
+  an empty response because the RPC sometimes returns one erroneously and the action
+  retries instead; waiting for the retries to run out keeps that behaviour intact while
+  letting probes that legitimately return no data — e.g. eip-165 `supportsInterface`
+  against a contract that returns empty rather than reverting — be served from the
+  cache on later runs.
+
+  A cached empty response is also treated as terminal by the retry loop. Without that,
+  every retry would re-read the same cached value and the action would spend its whole
+  backoff schedule (~64s) before failing.
+
+- Log a wrapped EVM fault from a `context.client` action at debug rather than warn,
+  completing the change in `0.17.1-ensnode.1`, which only applied it to the JSON-RPC
+  layer.
+
 ## 0.17.1-ensnode.1
 
 ### Patch Changes
