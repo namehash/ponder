@@ -1,5 +1,39 @@
 # @ensnode/ponder
 
+## 0.17.1-ensnode.0
+
+### Patch Changes
+
+- Synced the fork with upstream `ponder@0.17.1`. This pulls in the upstream `0.17`
+  release, which raises the minimum Node.js version to `22`, the minimum `viem`
+  version to `2.35`, and the minimum TypeScript version to `5.4.0`, and removes
+  telemetry entirely. See the `0.17.0` and `0.17.1` entries below for the full
+  upstream changelog.
+
+  Versioning now uses a suffixed-prerelease scheme: the base version names the exact
+  upstream release the fork tracks (`0.17.1`), and the `-ensnode.N` suffix counts
+  fork-only releases on top of it. This avoids the collision at `0.16.7`, where
+  `ponder@0.16.7` and `@ensnode/ponder@0.16.7` were different code. Because
+  `^0.17.1` does not match a prerelease under semver, consumers must pin the exact
+  version:
+
+  ```jsonc
+  // package.json
+  "dependencies": {
+    "ponder": "npm:@ensnode/ponder@0.17.1-ensnode.0"
+  }
+  ```
+
+  The fork delta relative to upstream `ponder@0.17.1` is unchanged:
+
+  - `PONDER_STATEMENT_TIMEOUT` env var to configure the Postgres `statement_timeout`
+    (in milliseconds) applied to the connection pools.
+  - Preserve user-defined database indexes during crash recovery instead of always
+    dropping them: indexes are kept when the previous instance had completed initial
+    sync (`is_ready === 1`) and the max block gap across chains is below
+    `PONDER_RECREATE_INDEXES_MIN_BLOCK_GAP` (default `10000`), plus the fix for
+    indexes not being created on the first run.
+
 ## 0.17.1
 
 ### Patch Changes
