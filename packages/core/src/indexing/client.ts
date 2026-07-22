@@ -444,6 +444,34 @@ export const decodeResponse = (response: Response) => {
   return parsed;
 };
 
+/**
+ * Decode a cached response for a single `aggregate3` sub-call.
+ *
+ * Multicall sub-calls are cached under the same key as the equivalent standalone
+ * `eth_call`, so a revert cached by the single-call path can be read back here. A live
+ * `aggregate3` reports a failing sub-call as `success: false` rather than failing the
+ * whole batch, so a cached revert has to do the same — using `decodeResponse` would
+ * throw and abort the entire multicall, making cached runs diverge from uncached ones.
+ */
+export const decodeMulticallResponse = (
+  response: Response,
+): { success: boolean; returnData: Hex } => {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(response);
+  } catch (_error) {
+    return { success: true, returnData: response as Hex };
+  }
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    REVERTED_SENTINEL_KEY in parsed
+  ) {
+    return { success: false, returnData: "0x" };
+  }
+  return { success: true, returnData: parsed };
+};
+
 export const createCachedViemClient = ({
   common,
   indexingBuild,
@@ -926,20 +954,14 @@ export const cachedTransport =
                   requestsToInsert.add(request);
                 }
 
-                results.set(request, {
-                  success: true,
-                  returnData: decodeResponse(result),
-                });
+                results.set(request, decodeMulticallResponse(result));
               } else {
                 common.metrics.ponder_indexing_rpc_requests_total.inc({
                   chain: chain.name,
                   method,
                   type: "prefetch_database",
                 });
-                results.set(request, {
-                  success: true,
-                  returnData: decodeResponse(cachedResult),
-                });
+                results.set(request, decodeMulticallResponse(cachedResult));
               }
             }
           }
@@ -964,10 +986,7 @@ export const cachedTransport =
                 type: "database",
               });
 
-              results.set(request, {
-                success: true,
-                returnData: decodeResponse(result),
-              });
+              results.set(request, decodeMulticallResponse(result));
             }
           }
 

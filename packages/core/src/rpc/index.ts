@@ -635,14 +635,15 @@ export const createRpc = ({
           }
 
           if (shouldRetry(error) === false) {
-            // An `execution reverted` result is a deterministic on-chain outcome, not
-            // an RPC/infra failure. In an indexer that probes contracts (e.g. eip-165
-            // `supportsInterface`) reverts are expected and handled by caller code, so
-            // log them at debug instead of spamming warn.
-            const isExpectedRevert =
-              typeof error?.message === "string" &&
-              error.message.includes("revert");
-            logger[isExpectedRevert ? "debug" : "warn"]({
+            // A deterministic on-chain execution outcome is not an RPC/infra failure.
+            // In an indexer that probes contracts (e.g. eip-165 `supportsInterface`)
+            // these are expected and handled by caller code, so log them at debug
+            // instead of spamming warn. The other reasons `shouldRetry` returns false
+            // (malformed JSON, unsupported method, 4xx/5xx) are real failures and stay
+            // at warn.
+            const isExpectedExecutionError =
+              isDeterministicExecutionError(error);
+            logger[isExpectedExecutionError ? "debug" : "warn"]({
               msg: "Received JSON-RPC error",
               chain: chain.name,
               chain_id: chain.id,

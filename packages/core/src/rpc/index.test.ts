@@ -116,3 +116,47 @@ test("isDeterministicExecutionError()", () => {
   );
   expect(isDeterministicExecutionError(undefined)).toBe(false);
 });
+
+test("createRpc() logs a deterministic EVM error at debug", async () => {
+  const chain = getChain();
+  const rpc = createRpc({
+    common: context.common,
+    chain,
+  });
+
+  const debugSpy = vi.spyOn(context.common.logger, "debug");
+  const warnSpy = vi.spyOn(context.common.logger, "warn");
+
+  // Some providers report an eip-165 probe against a non-supporting contract as a raw
+  // EVM fault rather than "execution reverted". It is still deterministic, so it must
+  // not be retried and must not be logged as an infra failure.
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    new Response(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32003, message: "EVM error InvalidFEOpcode" },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+
+  const error = await rpc
+    .request({
+      method: "eth_call",
+      params: [{ to: "0x0000000000000000000000000000000000000001" }, "0x1"],
+    })
+    .catch((error) => error);
+
+  expect(error).toBeInstanceOf(Error);
+
+  const isRpcErrorLog = (call: unknown[]) =>
+    (call[0] as { msg?: string })?.msg === "Received JSON-RPC error";
+
+  // logged once, at debug rather than warn
+  expect(debugSpy.mock.calls.filter(isRpcErrorLog)).toHaveLength(1);
+  expect(warnSpy.mock.calls.filter(isRpcErrorLog)).toHaveLength(0);
+
+  // and not retried, so the single mocked response was enough
+  expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+});

@@ -596,6 +596,90 @@ test("request() caches a deterministic revert", async () => {
   expect(requestSpy).toHaveBeenCalledTimes(0);
 });
 
+test("request() multicall with a cached revert", async () => {
+  const chain = getChain();
+  const rpc = createRpc({
+    chain,
+    common: context.common,
+  });
+
+  const { address } = await deployRevert({ sender: ALICE });
+  const { address: multicall } = await deployMulticall({ sender: ALICE });
+  const { address: erc20 } = await deployErc20({ sender: ALICE });
+  const blockData = await mintErc20({
+    erc20,
+    to: ALICE,
+    amount: parseEther("1"),
+    sender: ALICE,
+  });
+
+  const { syncStore } = await setupDatabaseServices();
+
+  const { eventCallbacks, indexingFunctions } = getErc20IndexingBuild({
+    address: erc20,
+  });
+  const event = getSimulatedEvent({
+    eventCallback: eventCallbacks[0],
+    blockData,
+  });
+
+  const cachedViemClient = createCachedViemClient({
+    common: context.common,
+    indexingBuild: { chains: [chain], rpcs: [rpc] },
+    syncStore,
+    eventCount: getEventCount(indexingFunctions),
+  });
+  cachedViemClient.event = event;
+
+  // a fixed historical block, after both contracts are deployed
+  const blockNumber = toHex(await publicClient.getBlockNumber());
+  const callData = encodeFunctionData({
+    abi: revertABI,
+    functionName: "revert",
+    args: [true],
+  });
+
+  const insertSpy = vi.spyOn(syncStore, "insertRpcRequestResults");
+
+  // cache the revert through a standalone call
+  await cachedViemClient
+    .getClient(chain)
+    .request({
+      method: "eth_call",
+      params: [{ to: address, data: callData }, blockNumber],
+    })
+    .catch(() => {});
+
+  expect(insertSpy).toHaveBeenCalledTimes(1);
+  await insertSpy.mock.results[0]!.value;
+
+  // multicall sub-calls share a cache key with the standalone call, so the cached
+  // revert is read back here. It must report a failed sub-call the way a live
+  // `aggregate3` does, rather than throwing and aborting the whole batch.
+  const response = await cachedViemClient.getClient(chain).request({
+    method: "eth_call",
+    params: [
+      {
+        to: multicall,
+        data: encodeFunctionData({
+          abi: multicall3Abi,
+          functionName: "aggregate3",
+          args: [[{ target: address, allowFailure: true, callData }]],
+        }),
+      },
+      blockNumber,
+    ],
+  });
+
+  expect(
+    decodeFunctionResult({
+      abi: multicall3Abi,
+      functionName: "aggregate3",
+      data: response as Hex,
+    }),
+  ).toMatchObject([{ success: false, returnData: "0x" }]);
+});
+
 test("readContract() action retry", async () => {
   const chain = getChain();
   const rpc = createRpc({
