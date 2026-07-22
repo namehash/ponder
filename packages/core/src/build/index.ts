@@ -1,6 +1,18 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { drizzle as drizzleNodePostgres } from "drizzle-orm/node-postgres";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { glob } from "glob";
+import { Hono } from "hono";
+import superjson from "superjson";
+import { hexToNumber } from "viem";
+import { createServer } from "vite";
+import { ViteNodeRunner } from "vite-node/client";
+import { ViteNodeServer } from "vite-node/server";
+import { installSourcemapsSupport } from "vite-node/source-map";
+import { normalizeModuleId, toFilePath } from "vite-node/utils";
+import viteTsconfigPathsPlugin from "vite-tsconfig-paths";
 import type { CliOptions } from "@/bin/ponder.js";
 import type { Config } from "@/config/index.js";
 import type { Database } from "@/database/index.js";
@@ -26,18 +38,6 @@ import { createPglite } from "@/utils/pglite.js";
 import { getNextAvailablePort } from "@/utils/port.js";
 import type { Result } from "@/utils/result.js";
 import { startClock } from "@/utils/timer.js";
-import { drizzle as drizzleNodePostgres } from "drizzle-orm/node-postgres";
-import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
-import { glob } from "glob";
-import { Hono } from "hono";
-import superjson from "superjson";
-import { hexToNumber } from "viem";
-import { createServer } from "vite";
-import { ViteNodeRunner } from "vite-node/client";
-import { ViteNodeServer } from "vite-node/server";
-import { installSourcemapsSupport } from "vite-node/source-map";
-import { normalizeModuleId, toFilePath } from "vite-node/utils";
-import viteTsconfigPathsPlugin from "vite-tsconfig-paths";
 import { safeBuildConfig, safeBuildIndexingFunctions } from "./config.js";
 import { vitePluginPonder } from "./plugin.js";
 import { safeBuildPre } from "./pre.js";
@@ -112,7 +112,9 @@ export const createBuild = async ({
     .replace(/\\/g, "/")
     // Escape special characters in the path.
     .replace(escapeRegex, "\\$&");
-  const indexingRegex = new RegExp(`^${escapedIndexingDir}/.*\\.(ts|js)$`);
+  const indexingRegex = new RegExp(
+    `^${escapedIndexingDir}/(?!.*\\.(test|spec)\\.).*\\.(ts|js)$`,
+  );
 
   const indexingPattern = path
     .join(common.options.indexingDir, "**/*.{js,mjs,ts,mts}")
@@ -120,6 +122,10 @@ export const createBuild = async ({
 
   const apiPattern = path
     .join(common.options.apiDir, "**/*.{js,mjs,ts,mts}")
+    .replace(/\\/g, "/");
+
+  const testFilePattern = path
+    .join(common.options.indexingDir, "**/*.{test,spec}.{js,mjs,ts,mts}")
     .replace(/\\/g, "/");
 
   const viteLogger = {
@@ -175,7 +181,9 @@ export const createBuild = async ({
 
   const executeFile = async ({
     file,
-  }: { file: string }): Promise<
+  }: {
+    file: string;
+  }): Promise<
     { status: "success"; exports: any } | { status: "error"; error: Error }
   > => {
     try {
@@ -190,7 +198,9 @@ export const createBuild = async ({
 
   const executeFileWithTimeout = async ({
     file,
-  }: { file: string }): Promise<
+  }: {
+    file: string;
+  }): Promise<
     { status: "success"; exports: any } | { status: "error"; error: Error }
   > => {
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -277,7 +287,7 @@ export const createBuild = async ({
     },
     async executeIndexingFunctions(): Promise<IndexingResult> {
       const files = glob.sync(indexingPattern, {
-        ignore: apiPattern,
+        ignore: [apiPattern, testFilePattern],
       });
 
       for (const file of files) {
@@ -300,7 +310,7 @@ export const createBuild = async ({
         try {
           const contents = fs.readFileSync(file, "utf-8");
           hash.update(contents);
-        } catch (e) {
+        } catch (_e) {
           common.logger.warn({
             msg: "Unable to read file",
             file,
@@ -655,7 +665,7 @@ export const createBuild = async ({
           ]);
           viteNodeRunner.moduleCache.invalidateDepTree(
             glob.sync(indexingPattern, {
-              ignore: apiPattern,
+              ignore: [apiPattern, testFilePattern],
             }),
           );
           viteNodeRunner.moduleCache.invalidateDepTree(glob.sync(apiPattern));
@@ -691,7 +701,7 @@ export const createBuild = async ({
                 rpc_chain_id: hexToNumber(chainId),
               });
             }
-          } catch (e) {
+          } catch (_e) {
             const error = new RetryableError("Failed to connect to JSON-RPC");
             error.stack = undefined;
             return { status: "error", error } as const;

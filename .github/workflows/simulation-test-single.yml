@@ -19,8 +19,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
+        with:
+          foundry: "false"
       - uses: oven-sh/setup-bun@v2
       
       - run: pnpm build

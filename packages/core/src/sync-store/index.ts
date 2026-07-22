@@ -1,4 +1,24 @@
 import crypto from "node:crypto";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
+import {
+  type PgColumn,
+  type PgSelectBase,
+  unionAll,
+} from "drizzle-orm/pg-core";
+import { type Address, hexToNumber, isHex } from "viem";
 import type { QB } from "@/database/queryBuilder.js";
 import { extractBlockNumberParam } from "@/indexing/client.js";
 import type { Common } from "@/internal/common.js";
@@ -49,30 +69,9 @@ import type {
   IntervalWithFilter,
 } from "@/runtime/index.js";
 import type { Interval } from "@/utils/interval.js";
-import { intervalUnion } from "@/utils/interval.js";
 import { toLowerCase } from "@/utils/lowercase.js";
 import { orderObject } from "@/utils/order.js";
 import { startClock } from "@/utils/timer.js";
-import {
-  type SQL,
-  and,
-  asc,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lt,
-  lte,
-  or,
-  sql,
-} from "drizzle-orm";
-import {
-  type PgColumn,
-  type PgSelectBase,
-  unionAll,
-} from "drizzle-orm/pg-core";
-import { type Address, hexToNumber, isHex } from "viem";
 import {
   encodeBlock,
   encodeLog,
@@ -203,7 +202,10 @@ export type SyncStore = {
 export const createSyncStore = ({
   common,
   qb,
-}: { common: Common; qb: QB<typeof PONDER_SYNC> }): SyncStore => {
+}: {
+  common: Common;
+  qb: QB<typeof PONDER_SYNC>;
+}): SyncStore => {
   const syncStore = {
     insertIntervals: async (
       { intervals, factoryIntervals, chainId },
@@ -419,31 +421,6 @@ export const createSyncStore = ({
             index += 1;
 
             result.get(factory)!.push({ fragment, intervals });
-          }
-
-          // Note: This is a stand-in for a migration to the `intervals` table
-          // required in `v0.15`. It is an invariant that filter with factories
-          // have a row in the intervals table for both the filter and the factory.
-          // If this invariant is broken, it must be because of the migration from
-          // `v0.14` to `v0.15`. In this case, we can assume that the factory interval
-          // is the same as the filter interval.
-
-          const filterIntervals = intervalUnion(
-            result.get(filter)!.flatMap(({ intervals }) => intervals),
-          );
-          const factoryIntervals = intervalUnion(
-            result.get(factory)!.flatMap(({ intervals }) => intervals),
-          );
-
-          if (
-            filterIntervals.length > 0 &&
-            factoryIntervals.length === 0 &&
-            filter.fromBlock === factory.fromBlock &&
-            filter.toBlock === factory.toBlock
-          ) {
-            for (const factoryInterval of result.get(factory)!) {
-              factoryInterval.intervals = filterIntervals;
-            }
           }
         }
       }
@@ -771,18 +748,32 @@ export const createSyncStore = ({
       traces: InternalTrace[];
       cursor: number;
     }> => {
-      const logFilters = filters.filter(
+      const activeFilters = filters.filter((filter) =>
+        isFilterInBlockRange({ filter, fromBlock, toBlock }),
+      );
+      const logFilters = activeFilters.filter(
         (f): f is LogFilter => f.type === "log",
       );
-      const transactionFilters = filters.filter(
+      const transactionFilters = activeFilters.filter(
         (f): f is TransactionFilter => f.type === "transaction",
       );
-      const traceFilters = filters.filter(
+      const traceFilters = activeFilters.filter(
         (f): f is TraceFilter => f.type === "trace",
       );
-      const transferFilters = filters.filter(
+      const transferFilters = activeFilters.filter(
         (f): f is TransferFilter => f.type === "transfer",
       );
+
+      const logBlockRange = getFilterBlockRange({
+        filters: logFilters,
+        fromBlock,
+        toBlock,
+      });
+      const traceBlockRange = getFilterBlockRange({
+        filters: [...traceFilters, ...transferFilters],
+        fromBlock,
+        toBlock,
+      });
 
       const shouldQueryBlocks = true;
       const shouldQueryLogs = logFilters.length > 0;
@@ -790,7 +781,7 @@ export const createSyncStore = ({
         traceFilters.length > 0 || transferFilters.length > 0;
       const shouldQueryTransactions =
         transactionFilters.length > 0 || shouldQueryLogs || shouldQueryTraces;
-      const shouldQueryTransactionReceipts = filters.some(
+      const shouldQueryTransactionReceipts = activeFilters.some(
         (filter) => filter.hasTransactionReceipt,
       );
 
@@ -835,7 +826,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeBlock(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         blockSelect[column] = PONDER_SYNC.blocks[column];
       }
 
@@ -862,7 +853,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeTransaction(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         transactionSelect[column] = PONDER_SYNC.transactions[column];
       }
 
@@ -891,7 +882,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeTransactionReceipt(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         transactionReceiptSelect[column] =
           PONDER_SYNC.transactionReceipts[column];
       }
@@ -926,7 +917,7 @@ export const createSyncStore = ({
       };
 
       for (const column of unionFilterIncludeTrace(filters)) {
-        // @ts-ignore
+        // @ts-expect-error
         traceSelect[column] = PONDER_SYNC.traces[column];
       }
 
@@ -936,8 +927,14 @@ export const createSyncStore = ({
         .where(
           and(
             eq(PONDER_SYNC.traces.chainId, BigInt(chainId)),
-            gte(PONDER_SYNC.traces.blockNumber, BigInt(fromBlock)),
-            lte(PONDER_SYNC.traces.blockNumber, BigInt(toBlock)),
+            gte(
+              PONDER_SYNC.traces.blockNumber,
+              BigInt(traceBlockRange.fromBlock),
+            ),
+            lte(
+              PONDER_SYNC.traces.blockNumber,
+              BigInt(traceBlockRange.toBlock),
+            ),
             or(
               ...traceFilters.map((filter) => traceFilter(filter)),
               ...transferFilters.map((filter) => transferFilter(filter)),
@@ -967,8 +964,8 @@ export const createSyncStore = ({
         .where(
           and(
             eq(PONDER_SYNC.logs.chainId, BigInt(chainId)),
-            gte(PONDER_SYNC.logs.blockNumber, BigInt(fromBlock)),
-            lte(PONDER_SYNC.logs.blockNumber, BigInt(toBlock)),
+            gte(PONDER_SYNC.logs.blockNumber, BigInt(logBlockRange.fromBlock)),
+            lte(PONDER_SYNC.logs.blockNumber, BigInt(logBlockRange.toBlock)),
             or(...logFilters.map((filter) => logFilter(filter))),
           ),
         )
@@ -1213,19 +1210,19 @@ export const createSyncStore = ({
         internalLog.address = toLowerCase(log.address);
         internalLog.removed = false;
         internalLog.topics = [
-          // @ts-ignore
+          // @ts-expect-error
           log.topic0,
           log.topic1,
           log.topic2,
           log.topic3,
         ];
-        // @ts-ignore
+        // @ts-expect-error
         log.topic0 = undefined;
-        // @ts-ignore
+        // @ts-expect-error
         log.topic1 = undefined;
-        // @ts-ignore
+        // @ts-expect-error
         log.topic2 = undefined;
-        // @ts-ignore
+        // @ts-expect-error
         log.topic3 = undefined;
       }
 
@@ -1499,12 +1496,47 @@ const addressFilter = (
 ): SQL => {
   // `factory` filtering is handled in-memory
   if (isAddressFactory(address)) return sql`true`;
-  // @ts-ignore
   if (Array.isArray(address)) return inArray(column, address);
-  // @ts-ignore
   if (typeof address === "string") return eq(column, address);
   return sql`true`;
 };
+
+/**
+ * @dev It's an invariant that the returned `fromBlock <= toBlock`.
+ */
+export const getFilterBlockRange = ({
+  filters,
+  fromBlock,
+  toBlock,
+}: {
+  filters: Pick<Filter, "fromBlock" | "toBlock">[];
+  fromBlock: number;
+  toBlock: number;
+}) => {
+  if (filters.length === 0) return { fromBlock, toBlock };
+
+  const ranges = filters.map((filter) => ({
+    fromBlock: Math.max(fromBlock, filter.fromBlock ?? fromBlock),
+    toBlock: Math.min(toBlock, filter.toBlock ?? toBlock),
+  }));
+
+  return {
+    fromBlock: Math.min(...ranges.map((range) => range.fromBlock)),
+    toBlock: Math.max(...ranges.map((range) => range.toBlock)),
+  };
+};
+
+const isFilterInBlockRange = ({
+  filter,
+  fromBlock,
+  toBlock,
+}: {
+  filter: Pick<Filter, "fromBlock" | "toBlock">;
+  fromBlock: number;
+  toBlock: number;
+}) =>
+  (filter.fromBlock ?? Number.NEGATIVE_INFINITY) <= toBlock &&
+  (filter.toBlock ?? Number.POSITIVE_INFINITY) >= fromBlock;
 
 export const logFilter = (filter: LogFilter): SQL => {
   const conditions: SQL[] = [];
@@ -1523,15 +1555,6 @@ export const logFilter = (filter: LogFilter): SQL => {
 
   conditions.push(addressFilter(filter.address, PONDER_SYNC.logs.address));
 
-  if (filter.fromBlock !== undefined) {
-    conditions.push(
-      gte(PONDER_SYNC.logs.blockNumber, BigInt(filter.fromBlock!)),
-    );
-  }
-  if (filter.toBlock !== undefined) {
-    conditions.push(lte(PONDER_SYNC.logs.blockNumber, BigInt(filter.toBlock!)));
-  }
-
   return and(...conditions)!;
 };
 
@@ -1541,13 +1564,6 @@ export const blockFilter = (filter: BlockFilter): SQL => {
   conditions.push(
     sql`(blocks.number - ${filter.offset}) % ${filter.interval} = 0`,
   );
-
-  if (filter.fromBlock !== undefined) {
-    conditions.push(gte(PONDER_SYNC.blocks.number, BigInt(filter.fromBlock!)));
-  }
-  if (filter.toBlock !== undefined) {
-    conditions.push(lte(PONDER_SYNC.blocks.number, BigInt(filter.toBlock!)));
-  }
 
   return and(...conditions)!;
 };
@@ -1560,17 +1576,6 @@ export const transactionFilter = (filter: TransactionFilter): SQL => {
   );
   conditions.push(addressFilter(filter.toAddress, PONDER_SYNC.transactions.to));
 
-  if (filter.fromBlock !== undefined) {
-    conditions.push(
-      gte(PONDER_SYNC.transactions.blockNumber, BigInt(filter.fromBlock!)),
-    );
-  }
-  if (filter.toBlock !== undefined) {
-    conditions.push(
-      lte(PONDER_SYNC.transactions.blockNumber, BigInt(filter.toBlock!)),
-    );
-  }
-
   return and(...conditions)!;
 };
 
@@ -1582,17 +1587,6 @@ export const transferFilter = (filter: TransferFilter): SQL => {
 
   if (filter.includeReverted === false) {
     conditions.push(isNull(PONDER_SYNC.traces.error));
-  }
-
-  if (filter.fromBlock !== undefined) {
-    conditions.push(
-      gte(PONDER_SYNC.traces.blockNumber, BigInt(filter.fromBlock!)),
-    );
-  }
-  if (filter.toBlock !== undefined) {
-    conditions.push(
-      lte(PONDER_SYNC.traces.blockNumber, BigInt(filter.toBlock!)),
-    );
   }
 
   return and(...conditions)!;
@@ -1615,17 +1609,6 @@ export const traceFilter = (filter: TraceFilter): SQL => {
   if (filter.functionSelector !== undefined) {
     conditions.push(
       eq(sql`substring(traces.input from 1 for 10)`, filter.functionSelector),
-    );
-  }
-
-  if (filter.fromBlock !== undefined) {
-    conditions.push(
-      gte(PONDER_SYNC.traces.blockNumber, BigInt(filter.fromBlock!)),
-    );
-  }
-  if (filter.toBlock !== undefined) {
-    conditions.push(
-      lte(PONDER_SYNC.traces.blockNumber, BigInt(filter.toBlock!)),
     );
   }
 

@@ -1,3 +1,5 @@
+import { type Hex, parseEther } from "viem";
+import { beforeEach, expect, test, vi } from "vitest";
 import { ALICE, BOB } from "@/_test/constants.js";
 import {
   context,
@@ -28,9 +30,9 @@ import type { LogFactory, LogFilter } from "@/internal/types.js";
 import { eth_getBlockByNumber } from "@/rpc/actions.js";
 import { createRpc } from "@/rpc/index.js";
 import { drainAsyncGenerator } from "@/utils/generators.js";
-import { parseEther } from "viem";
-import { beforeEach, expect, test, vi } from "vitest";
-import { type RealtimeSyncEvent, createRealtimeSync } from "./index.js";
+import { createRealtimeSync, type RealtimeSyncEvent } from "./index.js";
+
+const staleLogsBloom = `0x${"0".repeat(511)}1` as Hex;
 
 beforeEach(setupCommon);
 beforeEach(setupAnvil);
@@ -264,6 +266,70 @@ test("handleBlock() block event with log", async () => {
     (syncResult[0] as Extract<RealtimeSyncEvent, { type: "block" }>)
       ?.transactions,
   ).toHaveLength(1);
+});
+
+test("sync() skips log request when bloom does not match on standard chains", async () => {
+  const { common } = context;
+  await setupDatabaseServices();
+
+  const chain = getChain({ finalityBlockCount: 2 });
+  const rpc = createRpc({ common, chain });
+
+  const { address } = await deployErc20({ sender: ALICE });
+  const { eventCallbacks } = getErc20IndexingBuild({ address });
+
+  const finalizedBlock = await eth_getBlockByNumber(rpc, ["0x1", true]);
+  const realtimeSync = createRealtimeSync({
+    common,
+    chain,
+    rpc,
+    eventCallbacks,
+    syncProgress: { finalized: finalizedBlock },
+    childAddresses: new Map(),
+  });
+
+  const { block } = await simulateBlock();
+  const requestSpy = vi.spyOn(rpc, "request");
+
+  await drainAsyncGenerator(
+    realtimeSync.sync({ ...block, logsBloom: staleLogsBloom }),
+  );
+
+  expect(
+    requestSpy.mock.calls.some(([request]) => request.method === "eth_getLogs"),
+  ).toBe(false);
+});
+
+test("sync() requests logs despite bloom mismatch on async-execution chains", async () => {
+  const { common } = context;
+  await setupDatabaseServices();
+
+  const chain = { ...getChain({ finalityBlockCount: 2 }), id: 143 };
+  const rpc = createRpc({ common, chain });
+
+  const { address } = await deployErc20({ sender: ALICE });
+  const { eventCallbacks } = getErc20IndexingBuild({ address });
+
+  const finalizedBlock = await eth_getBlockByNumber(rpc, ["0x1", true]);
+  const realtimeSync = createRealtimeSync({
+    common,
+    chain,
+    rpc,
+    eventCallbacks,
+    syncProgress: { finalized: finalizedBlock },
+    childAddresses: new Map(),
+  });
+
+  const { block } = await simulateBlock();
+  const requestSpy = vi.spyOn(rpc, "request");
+
+  await drainAsyncGenerator(
+    realtimeSync.sync({ ...block, logsBloom: staleLogsBloom }),
+  );
+
+  expect(
+    requestSpy.mock.calls.some(([request]) => request.method === "eth_getLogs"),
+  ).toBe(true);
 });
 
 test("handleBlock() block event with log factory", async () => {
@@ -771,7 +837,7 @@ test("handleBlock() block event with transfer", async () => {
     common,
     chain,
     rpc: {
-      // @ts-ignore
+      // @ts-expect-error
       request,
     },
     eventCallbacks,
@@ -872,7 +938,7 @@ test("handleBlock() block event with trace", async () => {
     chain,
     rpc: {
       ...rpc,
-      // @ts-ignore
+      // @ts-expect-error
       request,
     },
     eventCallbacks,

@@ -2,8 +2,8 @@ import {
   type ColumnBaseConfig,
   type ColumnBuilderBaseConfig,
   type ColumnBuilderRuntimeConfig,
-  type MakeColumnConfig,
   entityKind,
+  type MakeColumnConfig,
 } from "drizzle-orm";
 import {
   type AnyPgTable,
@@ -24,14 +24,14 @@ export type PgBytesBuilderInitial<TName extends string> = PgBytesBuilder<{
 export class PgBytesBuilder<
   T extends ColumnBuilderBaseConfig<"buffer", "PgBytes">,
 > extends PgColumnBuilder<T> {
-  static readonly [entityKind]: string = "PgBytesBuilder";
+  static override readonly [entityKind]: string = "PgBytesBuilder";
 
   constructor(name: T["name"]) {
     super(name, "buffer", "PgBytes");
   }
 
   /** @internal */
-  // @ts-ignore
+  // @ts-expect-error
   override build<TTableName extends string>(
     table: AnyPgTable<{ name: TTableName }>,
   ): PgBytes<MakeColumnConfig<T, TTableName>> {
@@ -52,7 +52,7 @@ export class PgBytesBuilder<
 export class PgBytes<
   T extends ColumnBaseConfig<"buffer", "PgBytes">,
 > extends PgColumn<T> {
-  static readonly [entityKind]: string = "PgBytes";
+  static override readonly [entityKind]: string = "PgBytes";
 
   getSQLType(): string {
     return "bytea";
