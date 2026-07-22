@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   type Abi,
   type Account,
@@ -98,6 +99,26 @@ const UNCACHED_RESPONSES = ["0x", null] as any[];
  * @see cachedTransport
  */
 const REVERTED_SENTINEL_KEY = "__ponderReverted";
+
+/**
+ * State for one attempt of a `context.client` action, scoped across the async call chain
+ * so `cachedTransport` can cooperate with the action's retry loop.
+ *
+ * An empty (`"0x"`) response is not cached on sight, because the RPC sometimes returns
+ * one erroneously and the action retries first. Once those retries are exhausted the
+ * empty response is known to be stable and is worth caching — that is what
+ * `isFinalAttempt` signals downwards. `servedCachedEmptyResponse` reports back upwards
+ * that a response came from that cache, so the retry loop stops instead of re-reading
+ * the same cached value through its entire backoff schedule.
+ */
+type ClientActionAttempt = {
+  /** Whether this is the last attempt the action will make. */
+  isFinalAttempt: boolean;
+  /** Set by the transport when it served an empty response from the cache. */
+  servedCachedEmptyResponse: boolean;
+};
+
+const clientActionAttempt = new AsyncLocalStorage<ClientActionAttempt>();
 
 /** RPC methods that reference a block number. */
 const blockDependentMethods = new Set([
@@ -453,6 +474,21 @@ export const decodeResponse = (response: Response) => {
  * whole batch, so a cached revert has to do the same — using `decodeResponse` would
  * throw and abort the entire multicall, making cached runs diverge from uncached ones.
  */
+/**
+ * Decode a response that was served from the cache rather than the RPC.
+ *
+ * A cached empty response has already survived an action's retries, so it is reported to
+ * the retry loop to stop it from re-reading the same cached value on every attempt.
+ */
+const decodeCachedResponse = (response: Response) => {
+  const decoded = decodeResponse(response);
+  if (UNCACHED_RESPONSES.includes(decoded)) {
+    const attempt = clientActionAttempt.getStore();
+    if (attempt !== undefined) attempt.servedCachedEmptyResponse = true;
+  }
+  return decoded;
+};
+
 export const decodeMulticallResponse = (
   response: Response,
 ): { success: boolean; returnData: Hex } => {
@@ -619,9 +655,18 @@ export const createCachedViemClient = ({
         const RETRY_COUNT = 9;
         const BASE_DURATION = 125;
         for (let i = 0; i <= RETRY_COUNT; i++) {
+          const isFinalAttempt =
+            i === RETRY_COUNT ||
+            (args[0] as RetryableOptions).retryEmptyResponse === false;
+          const attempt: ClientActionAttempt = {
+            isFinalAttempt,
+            servedCachedEmptyResponse: false,
+          };
           try {
-            // @ts-expect-error
-            return await action(...args);
+            return await clientActionAttempt.run(attempt, () =>
+              // @ts-expect-error
+              action(...args),
+            );
           } catch (error) {
             const eventName =
               event.type === "setup"
@@ -636,19 +681,28 @@ export const createCachedViemClient = ({
                 (error as Error)?.message?.includes("returned no data") ===
                   false) ||
               i === RETRY_COUNT ||
-              (args[0] as RetryableOptions).retryEmptyResponse === false
+              (args[0] as RetryableOptions).retryEmptyResponse === false ||
+              // A cached empty response already survived a previous run's retries, so
+              // retrying would just re-read the same cached value on every attempt and
+              // spend the full backoff schedule doing it.
+              attempt.servedCachedEmptyResponse
             ) {
               const chain = indexingBuild.chains.find(
                 (n) => n.id === event.chain.id,
               )!;
-              // A contract revert OR a zero-data ("0x") response is a deterministic
-              // on-chain outcome that caller code is expected to handle (e.g. eip-165
+              // A deterministic execution outcome (a revert, or a raw EVM fault that
+              // some providers surface instead) or a zero-data ("0x") response is an
+              // on-chain result that caller code is expected to handle — e.g. eip-165
               // `supportsInterface` probes, which revert or return no data when
-              // unsupported). Log at debug instead of warn so these don't spam.
+              // unsupported. Log at debug instead of warn so these don't spam.
+              //
+              // Note: zero-data is checked separately rather than folded into
+              // `isDeterministicExecutionError`, because it is retryable, and treating
+              // it as deterministic would stop `shouldRetry` from retrying it at all.
               const isExpectedContractError =
-                typeof (error as Error)?.message === "string" &&
-                ((error as Error).message.includes("revert") ||
-                  (error as Error).message.includes("returned no data"));
+                isDeterministicExecutionError(error) ||
+                (error as Error)?.message?.includes("returned no data") ===
+                  true;
               common.logger[isExpectedContractError ? "debug" : "warn"]({
                 msg: "Failed 'context.client' action",
                 action: actionName,
@@ -1153,7 +1207,7 @@ export const cachedTransport =
               });
             }
 
-            return decodeResponse(cachedResult);
+            return decodeCachedResponse(cachedResult);
           }
 
           const [cachedResult] = await syncStore.getRpcRequestResults(
@@ -1168,7 +1222,7 @@ export const cachedTransport =
               type: "database",
             });
 
-            return decodeResponse(cachedResult);
+            return decodeCachedResponse(cachedResult);
           }
 
           common.metrics.ponder_indexing_rpc_requests_total.inc({
@@ -1212,7 +1266,22 @@ export const cachedTransport =
               throw error;
             });
 
-          if (UNCACHED_RESPONSES.includes(response) === false) {
+          // An empty `eth_call` response at a fixed historical block is only cached once
+          // the calling action has exhausted its retries. Until then it may be an
+          // erroneous `"0x"` from the RPC, which is why `UNCACHED_RESPONSES` excludes it
+          // by default; after the retries it is stable, and caching it stops probes
+          // (e.g. eip-165 `supportsInterface`) from re-issuing a request on every run.
+          const isStableEmptyResponse =
+            method === "eth_call" &&
+            encodedBlockNumber !== undefined &&
+            encodedBlockNumber !== 0 &&
+            response === "0x" &&
+            clientActionAttempt.getStore()?.isFinalAttempt === true;
+
+          if (
+            UNCACHED_RESPONSES.includes(response) === false ||
+            isStableEmptyResponse
+          ) {
             // Note: insertRpcRequestResults errors can be ignored and not awaited, since
             // the response is already fetched.
             syncStore

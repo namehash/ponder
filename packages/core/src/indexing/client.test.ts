@@ -832,6 +832,136 @@ test("readContract() with no retry empty response", async () => {
   ).rejects.toThrow();
 });
 
+test("readContract() does not cache an empty response before retries are exhausted", async () => {
+  const chain = getChain();
+  const rpc = createRpc({
+    chain,
+    common: context.common,
+  });
+
+  const { address } = await deployErc20({ sender: ALICE });
+  const blockData = await mintErc20({
+    erc20: address,
+    to: ALICE,
+    amount: parseEther("1"),
+    sender: ALICE,
+  });
+
+  const { syncStore } = await setupDatabaseServices();
+
+  const { eventCallbacks, indexingFunctions } = getErc20IndexingBuild({
+    address,
+  });
+
+  const event = getSimulatedEvent({
+    eventCallback: eventCallbacks[0],
+    blockData,
+  });
+
+  const cachedViemClient = createCachedViemClient({
+    common: context.common,
+    indexingBuild: { chains: [chain], rpcs: [rpc] },
+    syncStore,
+    eventCount: getEventCount(indexingFunctions),
+  });
+  cachedViemClient.event = event;
+
+  const insertSpy = vi.spyOn(syncStore, "insertRpcRequestResults");
+  const requestSpy = vi.spyOn(rpc, "request");
+
+  // one erroneous empty response, then the real value
+  requestSpy.mockReturnValueOnce(Promise.resolve("0x"));
+
+  const totalSupply = await cachedViemClient.getClient(chain).readContract({
+    abi: erc20ABI,
+    functionName: "totalSupply",
+    address,
+  });
+
+  expect(totalSupply).toBe(parseEther("1"));
+
+  // the transient "0x" was retried, and must not have been written to the cache
+  const insertedResults = insertSpy.mock.calls.flatMap((call) =>
+    call[0].requests.map((request) => request.result),
+  );
+  expect(insertedResults).not.toContain(JSON.stringify("0x"));
+});
+
+test("readContract() caches an empty response once retries are exhausted", async () => {
+  const chain = getChain();
+  const rpc = createRpc({
+    chain,
+    common: context.common,
+  });
+
+  const { address } = await deployErc20({ sender: ALICE });
+  const blockData = await mintErc20({
+    erc20: address,
+    to: ALICE,
+    amount: parseEther("1"),
+    sender: ALICE,
+  });
+
+  const { syncStore } = await setupDatabaseServices();
+
+  const { eventCallbacks, indexingFunctions } = getErc20IndexingBuild({
+    address,
+  });
+
+  const event = getSimulatedEvent({
+    eventCallback: eventCallbacks[0],
+    blockData,
+  });
+
+  const cachedViemClient = createCachedViemClient({
+    common: context.common,
+    indexingBuild: { chains: [chain], rpcs: [rpc] },
+    syncStore,
+    eventCount: getEventCount(indexingFunctions),
+  });
+  cachedViemClient.event = event;
+
+  const insertSpy = vi.spyOn(syncStore, "insertRpcRequestResults");
+  const requestSpy = vi.spyOn(rpc, "request");
+
+  // `retryEmptyResponse: false` makes the first attempt the last one, so the empty
+  // response is already known to be stable
+  requestSpy.mockReturnValueOnce(Promise.resolve("0x"));
+
+  await expect(
+    cachedViemClient.getClient(chain).readContract({
+      abi: erc20ABI,
+      functionName: "totalSupply",
+      address,
+      retryEmptyResponse: false,
+    }),
+  ).rejects.toThrow();
+
+  const insertedResults = insertSpy.mock.calls.flatMap((call) =>
+    call[0].requests.map((request) => request.result),
+  );
+  expect(insertedResults).toContain(JSON.stringify("0x"));
+
+  // flush the fire-and-forget write before reading it back
+  await insertSpy.mock.results[0]!.value;
+
+  requestSpy.mockClear();
+  const getSpy = vi.spyOn(syncStore, "getRpcRequestResults");
+
+  // the cached empty response is served without an RPC request, and without the retry
+  // loop re-reading it once per attempt through its whole backoff schedule
+  await expect(
+    cachedViemClient.getClient(chain).readContract({
+      abi: erc20ABI,
+      functionName: "totalSupply",
+      address,
+    }),
+  ).rejects.toThrow();
+
+  expect(requestSpy).toHaveBeenCalledTimes(0);
+  expect(getSpy).toHaveBeenCalledTimes(1);
+});
+
 test("getBlock() action retry", async () => {
   const chain = getChain();
   const rpc = createRpc({
